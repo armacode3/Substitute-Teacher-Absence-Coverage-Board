@@ -4,12 +4,12 @@
 
 Build a reliable teacher absence and substitute coverage workflow using the existing stack. The required outcome is:
 - Teachers can create an absence with a time window and optional reason/subject.
-- The board lists every absence, its teacher, time window, Open/Claimed status, and assigned substitute.
-- Substitutes can claim open absences, but cannot double-book themselves or claim an already claimed absence.
+- The board lists every absence, its teacher, time window, derived coverage status, assignments, and remaining gaps.
+- Substitutes can cover whole absences or selected uncovered portions, but cannot double-book themselves or double-cover the same absence window. Split coverage is a user-approved extension; status can be Open, Partially Covered, or Claimed (fully covered).
 - The backend validates input and enforces the rules independently of the UI.
 - Architecture diagrams, automated tests, and an honest AI collaboration log accompany the implementation.
 
-The README suggests a roughly 60-minute exercise. Favor correctness and a small complete feature over extra features or a new framework. Recommendations below are proposals for review, not approved implementation decisions.
+The README suggests a roughly 60-minute exercise. Favor correctness and a small complete feature over extra features or a new framework. Recommendations below are proposals unless explicitly marked approved.
 
 ## Current architecture and baseline
 
@@ -20,8 +20,8 @@ The README suggests a roughly 60-minute exercise. Favor correctness and a small 
 | `src/db.js` | Opens SQLite, enables foreign keys, creates `users`, and seeds three teachers and two substitutes if the table is empty. Supports an explicit database path, `DB_PATH`, or a default `school.db`. |
 | `public/index.html` | Inline CSS and JavaScript; displays seeded users. Absence form and coverage board are placeholders. |
 | `tests/api.test.js` | Vitest + Supertest; creates an in-memory app for each test. One seeded-user test exists. |
-| `ARCHITECTURE.md` | Required ERD, claim-flow, and design-review templates; not yet completed. |
-| `AI_LOG.md` | Required AI tooling, prompts, and edge-case review template; not yet completed. |
+| `ARCHITECTURE.md` | Proposed ERD, create/merge and claim flows, and actual review corrections; overall design still under review. |
+| `AI_LOG.md` | Planning tooling/prompts and genuine design course corrections recorded; implementation/testing evidence remains to add. |
 
 Request flow: browser → Express routes → synchronous `better-sqlite3` queries → SQLite → JSON response → browser rendering. No frontend build, authentication, ORM, or external service is present or needed for the stated task.
 
@@ -31,39 +31,46 @@ Baseline: `npm test` passes (1 test). Dependencies are already installed. Git ha
 
 ### 1. Coverage data model
 
-**Recommended:** one `absences` table with `id`, `teacher_id`, `start_time`, `end_time`, optional `reason`, and nullable `substitute_id`.
-- A null substitute means Open; a non-null substitute means Claimed. Derive status rather than store a second value that can disagree.
-- Foreign keys reference `users`; required fields and `CHECK (end_time > start_time)` protect row integrity.
-- Foreign keys alone do not enforce teacher/substitute roles. Validate roles in the API; add triggers only if we decide direct database writes also need role enforcement.
-- Suitable for the requirement of exactly one substitute per absence.
-
-**Alternative:** separate `absences` and `assignments` tables, with a unique absence reference in assignments. Better for assignment history or reassignment, but adds joins and complexity without a current requirement.
+**Approved:** separate `absences` and `assignments` tables supporting actual split coverage now, not merely future extensibility.
+- Absences store teacher, start/end, and distinct reasons. Assignments store absence, substitute, and their own start/end.
+- Do not make assignment `absence_id` or `substitute_id` unique. Enforce non-overlapping windows instead.
+- Each assignment must fit entirely inside its absence. Reject double coverage of the same absence, even by different substitutes, and overlapping assignments for the same substitute across all absences.
+- Derive Open / Partially Covered / Claimed and remaining gaps from ordered assignment intervals.
+- Foreign keys, required fields, and positive-duration checks protect row integrity. Role and cross-row checks belong in the transactional API unless additional database triggers are chosen.
+- Original single-table assignment and one-assignment-per-absence proposals were rejected in favor of real split coverage.
 
 ### 2. Time representation and interval semantics
 
-**Recommended:** accept strictly validated ISO timestamps containing `Z` or a numeric UTC offset; normalize to integer Unix milliseconds in SQLite; return canonical ISO strings in the API. The browser converts `datetime-local` inputs to ISO before sending.
+**Approved:** accept strictly validated ISO timestamps containing `Z` or a numeric UTC offset; normalize to integer UTC Unix milliseconds in SQLite; return canonical ISO strings in the API. The browser converts `datetime-local` inputs to ISO before sending. Milliseconds were selected for JavaScript convenience; seconds would also have sufficient scheduling precision. Following user review, accept higher fractional precision and explicitly truncate to milliseconds, rather than reject valid timestamps solely for excess precision.
 - Validate actual calendar dates, not just a permissive `Date.parse` result, and require end > start.
-- Treat windows as half-open: `[start, end)`. Back-to-back shifts are allowed.
+- Validate full input before truncation; check duration/containment/conflicts after normalization. Reject a positive sub-millisecond window if both endpoints collapse to the same millisecond. Returning normalized values makes the loss of sub-millisecond precision explicit; this is not lossless archival storage.
+- **Approved:** treat windows as half-open: `[start, end)`. Back-to-back substitute shifts are allowed, and adjacent teacher absences remain separate.
 - Conflict condition: `existing.start_time < requested.end_time AND existing.end_time > requested.start_time`.
 
 **Alternative:** store canonical UTC ISO strings. Readable in SQLite and comparable if every value is normalized identically. Never compare raw mixed-offset timestamp strings.
 
-Confirm how to interpret timezone-less input. The README allows an ISO timestamp or date/time; an explicit-offset API contract is a proposed way to remove ambiguity, not an already stated requirement. Do not add past-date restrictions unless agreed.
+Julian-day storage is another valid SQLite option, but offers no scheduling advantage here. ISO input/output and numeric storage are complementary choices, not competing formats for the same layer.
+
+Timezone-less API input is rejected under the approved explicit-offset contract; the browser converts local inputs first and clearly displays the timezone. Ended absence/coverage windows cannot be claimed; an in-progress start policy remains to settle. Historical absence creation has not been prohibited.
 
 ### 3. Atomic claiming
 
-**Recommended:** perform existence, role, already-claimed, schedule-overlap, and assignment checks inside a short SQLite immediate transaction. Use a guarded update (`... WHERE substitute_id IS NULL`) and check the affected-row count.
+**Recommended mechanics for the approved assignment model:** perform absence/user lookup, role checks, assignment containment, same-absence overlap, and substitute schedule overlap inside a short SQLite immediate transaction, then insert the assignment.
 - Acquire the write reservation before reading conflicts, so another writer cannot insert a conflicting assignment between the check and update.
-- A guarded update alone prevents two claimants taking the same absence but does not prevent one substitute claiming two different overlapping absences.
+- A unique absence constraint is no longer appropriate. Both interval checks must remain inside the transaction; adjacent split claims can both succeed.
 - Handle lock contention deliberately; avoid exposing raw SQLite errors as API responses.
 
 **Alternative:** database triggers can enforce overlap/role constraints for all write paths. They provide stronger database-wide protection but add SQL complexity. A single application claim path plus an immediate transaction is the proposed take-home scope.
 
 ### 4. Extra business rules and feature boundaries
 
-Discuss whether to reject overlapping absences for the same teacher. It is sensible but not explicitly required; keep it optional until agreed.
+**Approved by the user:** merge overlapping open absences for the same teacher into one combined window, preserve distinct reasons, and retain the lowest existing ID. Reject the entire request with `409` if any affected absence has any assignment, including partial coverage; never silently extend a substitute's commitment. Overlap checks and merge writes run in one immediate transaction, serialized with claims. Different teachers' absences remain separate. Proposed reason representation: JSON array with exact deduplication after trimming.
 
-Keep cancellation, unclaim/reassignment, authentication, notifications, pagination, and UI redesign out of the initial scope. Selecting a user ID simulates an actor; role validation is not real authentication.
+**Approved extensions:** substitute cancellation that reopens remaining coverage, explicit teacher early return that shortens/releases assignments, and informational certification metadata. Final mechanics and operational defaults are in `ARCHITECTURE.md`. These lifecycle operations are distinct from ordinary merging, which cannot change accepted coverage.
+
+Keep authentication, full audit history, notifications, pagination, travel buffers, availability/workload rules, and UI redesign deferred. Certifications are informational, without eligibility enforcement or invented seeded credentials. Breaks use separate absence windows rather than inferred lunch periods. Selecting a user ID simulates an actor; role validation is not authentication. The user deprioritized reason-privacy features, not basic safe input/output handling.
+
+**Approved:** layered enforcement boundaries. Use database constraints, backend validation, transactional conflict checks, parameterized SQL, and safe text rendering. Exact trigger coverage remains open; these controls do not substitute for production authentication/authorization.
 
 ## Proposed API contract
 
@@ -71,11 +78,15 @@ Keep the existing `/api/users` endpoint.
 
 | Endpoint | Input / output | Main outcomes |
 | --- | --- | --- |
-| `POST /api/absences` | `{ teacher_id, start_time, end_time, reason? }`; returns created absence | `201`; `400` for invalid fields, unknown teacher, or wrong role |
-| `GET /api/absences` | Array with teacher name, timestamps, derived status, and substitute ID/name if claimed | `200`, including `[]` when empty |
-| `POST /api/absences/:id/claim` | `{ substitute_id }`; returns updated absence | `200`; `400` invalid ID/body/actor role; `404` missing absence; `409` already claimed or overlapping assignment |
+| `POST /api/absences` | `{ teacher_id, start_time, end_time, reason? }`; returns resulting absence | Approved: `201` created / `200` merged; `400` invalid input; `409` for same-teacher overlap involving claimed coverage |
+| `GET /api/absences` | Array with teacher name, reasons, timestamps, derived status, assignments/substitute names, and uncovered windows | `200`, including `[]` when empty |
+| `POST /api/absences/:id/claim` | `{ substitute_id, start_time, end_time }`, both times required; returns updated absence with assignments | `200`; `400` invalid input/role/out-of-bounds window; `404` missing absence; `409` overlapping coverage, substitute schedule, or expired window (proposed expiry status) |
 
-Finalize exact response fields, status casing, validation order, and consistent JSON error shape before implementation. Return joined display data rather than requiring the browser to assemble relationships.
+The user approved the proposed HTTP response codes. Finalize exact response fields, status casing, validation order, and consistent JSON error shape before implementation. Return joined display data rather than requiring the browser to assemble relationships.
+
+**Approved:** require explicit start/end on every claim; remove the whole-current-absence shortcut. Never silently claim multiple gaps or trim/expand requested windows. The UI allows claims on Open and Partially Covered records with non-expired requested windows.
+
+Concurrency/recovery recommendation: all writes use short immediate transactions with all-or-nothing rollback; construct board data with batched reads in one consistent snapshot. Disable pending controls, recover ambiguous network outcomes by refreshing, and do not blindly retry writes. Gap scanning is linear in that absence's ordered assignments; indexed teacher-overlap lookup and its performance limits are documented in `DESIGN_REVIEW.md`.
 
 ## Implementation milestones
 
@@ -91,17 +102,19 @@ Finalize exact response fields, status casing, validation order, and consistent 
 - Suggested commit: `1. Architecture plan`.
 
 ### 2. Database, API, and tests together
-- Add the agreed absence schema to `createDb()` without disturbing existing user seeds.
+- Add absence and timed-assignment schemas and lookup indexes to `createDb()` without disturbing user seeds.
 - Add focused validation and the create/list/claim endpoints, following the current CommonJS style.
 - Implement atomic conflict checks and consistent JSON errors.
+- Add reviewed cancellation/early-return operations with the same transaction boundaries; reject ended claim windows using an injectable server clock.
 - Grow integration tests alongside each behavior; close database connections in test cleanup.
 - Suggested commit: `2. DB & API`.
 
 ### 3. Minimal usable frontend
 - Populate a teacher selector and absence form with start/end inputs and optional reason.
-- Populate a substitute selector and render all open/claimed absences with joined names.
-- Show claim buttons only for open shifts; refresh the board after successful writes.
+- Populate a substitute selector and render all statuses, each assignment with its substitute/time range, distinct reasons, and uncovered gaps.
+- Allow selection of a continuous uncovered time range on Open or Partially Covered absences; refresh after successful writes. Keep full-absence claiming easy for completely open shifts.
 - Show server/network errors, pending/disabled controls, and empty states. Refresh after a stale-board claim conflict.
+- Display timezone/offset clearly and provide reviewed cancellation/early-return controls. Refresh after successful writes and stale `404`/`409` responses; recover unknown network outcomes from the current board.
 - Render user-controlled content safely using DOM text APIs, not unsanitized HTML interpolation.
 - Keep the existing stylesheet; no frontend framework or build tooling.
 
@@ -119,12 +132,28 @@ Required behavior:
 - Create a valid absence, including one without a reason.
 - List empty, open, and claimed results with correct names and deterministic ordering.
 - Claim successfully as a substitute; persist and display the assignment.
+- Split one absence between multiple substitutes and verify Open → Partially Covered → Claimed as the final gap is filled.
+- Verify separated assignments leave an internal gap; never mark full coverage just because assignments exist.
+- Reject out-of-bounds assignment windows and overlaps within one absence even with different substitutes.
+- Allow adjacent assignments within one absence, including different substitutes, and the same substitute returning for another non-overlapping portion.
 - Reject missing/invalid IDs, unknown users, and users with the wrong role.
 - Reject missing, malformed, impossible, equal, or reversed times; test timezone normalization.
+- Accept valid fractions longer than milliseconds, verify truncation and canonical output, and reject malformed inputs or intervals that collapse to zero duration after normalization. Exercise conflict checks at normalized boundaries.
 - Reject an already claimed absence without changing its assignment.
 - Reject overlapping shifts for the same substitute: partial overlap, containment, and identical windows.
 - Allow back-to-back shifts and overlapping windows covered by different substitutes.
 - Rejections leave database state unchanged.
+- Require both claim times, reject ended requested windows, and use a controlled clock for deterministic boundary tests.
+- Test multiple leading/internal/trailing coverage gaps and stale explicit claims after an ID-preserving merge.
+- After lifecycle semantics are agreed: test cancellation reopening only released time and early return leaving/truncating/removing assignments at the cutoff. Exercise lifecycle-versus-claim races and failures midway through multi-row operations.
+- Verify board responses use a consistent absence/assignment snapshot during concurrent writes; UI double-click prevention is not a substitute for backend conflict checks.
+
+Approved teacher-merge behavior:
+- Merge partially overlapping, contained, identical, and multiple connected open windows for the same teacher.
+- Preserve reasons and apply the agreed record-ID policy.
+- Keep different teachers' records separate; keep merely adjacent windows separate under the approved interval policy.
+- Reject any same-teacher overlap involving an absence with any assignment (including partial coverage), leaving all records and assignments unchanged, even when the request also overlaps open records.
+- Verify merging and claiming cannot interleave into a silently extended assignment; stale merged-away IDs return `404`.
 
 Additional reliability checks if time permits:
 - Assert basic constraints through direct database writes.
@@ -134,4 +163,4 @@ Additional reliability checks if time permits:
 
 ## Current next action
 
-Review the recommended model, time policy, transaction approach, and optional teacher-overlap rule together. Then complete the architecture deliverable before writing application code.
+Architecture review is complete. Validate/commit the architecture milestone, then implement the database/API with tests for split coverage, simple indexed merging, linear gaps, cancellations, early return, certifications, rollback, expiry, and separate-connection concurrency. Leave UI work for the following milestone.
