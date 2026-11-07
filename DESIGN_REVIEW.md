@@ -2,7 +2,7 @@
 
 ## Status
 
-This began as a review of the proposed architecture, not a report of implemented bugs. The reviewed database/API is now implemented and passes 84 tests, including injected-failure rollback and separate-process concurrency cases. The frontend is not yet connected. The scenarios below remain useful as a risk checklist; they are not claims that every production use case is supported. Final contracts/defaults are in `ARCHITECTURE.md`.
+This began as a prospective design review. The full feature is now implemented with 108 automated tests, including rollback, separate-process concurrency, and frontend DOM/API interactions. Isolated Chromium checks verified real workflows, stale conflicts, committed-response loss, mobile layout, and DST. The checklist is not a claim that every production use case is supported. Final contracts/defaults are in `ARCHITECTURE.md`; walkthrough in `DEMO.md`.
 
 ## High-priority correctness scenarios
 
@@ -10,7 +10,7 @@ This began as a review of the proposed architecture, not a report of implemented
 
 Scenario: a substitute sees absence ID 1 as 09:00–12:00. Another request merges it into 09:00–15:00, preserving ID 1. The substitute sends an ID-only claim; resolving omitted times against the current row would assign hours they never saw.
 
-Proposed immediate protection: the UI always sends explicit selected start/end timestamps. A stale 09:00–12:00 request can then cover only that range, leaving the remainder uncovered. Never silently expand the submitted window.
+Implemented protection: the UI sends explicit selected start/end timestamps and preserves edited drafts during actor changes/refreshes. A stale 09:00–12:00 request can cover only that range, leaving the remainder uncovered. Never silently expand the submitted window.
 
 **Resolved:** the user requires explicit start/end timestamps on every claim; remove the optional-time shortcut. A version precondition remains a stronger alternative if any change to an absence should require renewed confirmation. Explicit times protect the time window, not changes to reasons or other future terms, and do not make every client's display permanently current.
 
@@ -81,7 +81,7 @@ The server can commit a claim while its response is lost. Retrying should not cr
 
 Minimal recovery: show a useful error and reload current assignments before the user tries again. Disable pending buttons, but do not rely on that for server correctness. Repeated absence submissions should preserve distinct reasons without duplication; retries after intervening claims can still conflict. Durable idempotency keys are a future improvement, not a guarantee of this design.
 
-The user approved visible timezone, duplicate-click prevention, recovery after ambiguous failures, and prioritizing read/write concurrency. Build board data in a short read transaction so absence times and assignments come from the same snapshot, even while another process writes. Refresh after writes and stale-ID/conflict responses; snapshots are coherent at a point in time, not permanently fresh. A last-updated indicator/manual refresh is the proposed minimum; polling or push can follow later.
+Implemented: snapshot reads, explicit timezone/offsets, pending controls, refresh after writes/errors, and a last-updated/manual-refresh indicator. Failed reloads disable mutations until recovery. A lost response after commit is exercised in DOM/API tests and real Chromium; no automatic retry occurs. Snapshots remain point-in-time, not permanently fresh; polling/push and durable idempotency keys remain deferred.
 
 ### 7. Input, output, and storage boundaries
 
@@ -115,10 +115,11 @@ The user approved visible timezone, duplicate-click prevention, recovery after a
 - Database cross-row protections currently assume writes go through the API. Maintenance scripts or later write endpoints must follow the same rules or stronger triggers must be added.
 - Timed assignments make the domain model extensible, not infinitely scalable. SQLite still serializes writers. Keep transactions short, index conflict lookups, avoid per-row query loops, and revisit persistence for higher write concurrency.
 - Pagination/filtering, bounded query ranges, migrations, backups, monitoring, and access-controlled deployment are production follow-ups rather than requirements to add automatically to the take-home.
+- Dependency audit: six findings in the existing Vitest/Vite development-tool chain, including critical findings; production-only audit reports zero. No force/major upgrade was applied as part of frontend work. Review the dev toolchain separately and do not expose test/development servers or run untrusted tests.
 
 ## Suggested priority
 
-1. Core backend interval/concurrency/rollback protections are implemented and tested. Connect UI controls with explicit times, visible timezone, pending states, and refresh-based recovery; manually exercise real browser behavior.
+1. Core backend and frontend are implemented/tested, including browser smoke checks. Next is the user's final walkthrough and submission review, not additional unapproved features.
 2. Use separate absence windows around known breaks. Do not guess breaks from a continuous 09:00–16:00 request. A teaching-period calendar or required-coverage windows model would be a separate extension.
 3. Certifications remain informational metadata, not proof of verification or enforced eligibility. No availability/workload engine is included.
 4. Keep recurrence, travel buffers, authentication, full audits, and whole-absence cancellation before its start deferred.

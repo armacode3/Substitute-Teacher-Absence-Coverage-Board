@@ -8,61 +8,84 @@
     body { font-family: system-ui, -apple-system, sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; color: #1f2937; background: #f9fafb; }
     h1, h2 { color: #111827; }
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
-    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 1.25rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .card { min-width: 0; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 1.25rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
     table { width: 100%; border-collapse: collapse; margin-top: 0.75rem; font-size: 0.9rem; }
     th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #e5e7eb; }
     .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
     .badge-teacher { background: #dbeafe; color: #1e40af; }
     .badge-substitute { background: #fef3c7; color: #92400e; }
     label { display: block; font-size: 0.85rem; font-weight: 600; margin-top: 0.75rem; }
-    input, select, button { width: 100%; padding: 0.5rem; margin-top: 0.25rem; box-sizing: border-box; border: 1px solid #d1d5db; border-radius: 4px; }
+    input, select, textarea, button { width: 100%; padding: 0.5rem; margin-top: 0.25rem; box-sizing: border-box; border: 1px solid #d1d5db; border-radius: 4px; }
     button { background: #2563eb; color: white; font-weight: 600; border: none; cursor: pointer; margin-top: 1rem; }
     button:hover { background: #1d4ed8; }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+    fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+    .muted { color: #4b5563; font-size: 0.9rem; }
+    .toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; margin: 1rem 0; }
+    .toolbar button { width: auto; margin: 0; }
+    .notice { padding: 0.75rem; border: 1px solid #2563eb; background: #eff6ff; }
+    .notice[data-kind="error"] { border-color: #b91c1c; color: #991b1b; background: #fef2f2; }
+    .table-wrap { overflow-x: auto; }
+    .absence { border-top: 1px solid #d1d5db; margin-top: 1.5rem; padding-top: 0.5rem; }
+    .reason { white-space: pre-wrap; overflow-wrap: anywhere; }
+    .action-form { margin: 1rem 0; padding: 0.75rem; border: 1px solid #e5e7eb; }
+    [hidden] { display: none !important; }
+    @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
   </style>
+  <script src="/app.js" defer></script>
 </head>
 <body>
   <h1>Oakridge School District — Absence & Sub Coverage</h1>
+  <p class="muted">Demo: selecting a staff member simulates their identity; this is not a sign-in system.</p>
+  <p id="timezone-label" class="muted"></p>
+  <div class="toolbar">
+    <button id="refresh-button" type="button">Refresh directory &amp; board</button>
+    <span id="last-updated" class="muted">Not yet loaded.</span>
+  </div>
+  <p id="notice" class="notice" role="status" aria-live="polite" hidden></p>
 
+  <fieldset id="portal-controls" aria-label="Scheduling controls" disabled>
   <div class="grid">
     <div class="card">
       <h2>Staff Directory (Seeded)</h2>
-      <table>
+      <div class="table-wrap"><table>
         <thead>
-          <tr><th>ID</th><th>Name</th><th>Role</th></tr>
+          <tr><th scope="col">ID</th><th scope="col">Name</th><th scope="col">Role</th><th scope="col">Certifications</th></tr>
         </thead>
         <tbody id="users-tbody"></tbody>
-      </table>
+      </table></div>
+      <p class="muted">Credentials are informational records, not verified eligibility. No credentials are seeded.</p>
     </div>
 
     <div class="card">
       <h2>Log Teacher Absence</h2>
       <div id="absence-form-container">
-        <p style="color: #6b7280; font-size: 0.9rem;">TODO: Build form to create an absence.</p>
+        <form id="absence-form">
+          <label for="teacher-select">Act as teacher</label>
+          <select id="teacher-select" name="teacher_id" required><option value="">Select a teacher</option></select>
+          <label for="absence-start">Start (local time)</label>
+          <input id="absence-start" name="start_time" type="datetime-local" step="0.001" required />
+          <label for="absence-end">End (local time)</label>
+          <input id="absence-end" name="end_time" type="datetime-local" step="0.001" required />
+          <label for="absence-reason">Reason or subject (optional)</label>
+          <textarea id="absence-reason" name="reason" rows="3" maxlength="2000"></textarea>
+          <p id="absence-preview" class="muted" aria-live="polite">Select start and end times to preview their UTC offsets.</p>
+          <p class="muted">Use separate absence windows around breaks. Overlapping open windows for the same teacher merge; windows with any coverage do not.</p>
+          <button type="submit">Log absence</button>
+        </form>
       </div>
     </div>
   </div>
 
   <div class="card">
     <h2>Absence & Coverage Board</h2>
+    <label for="substitute-select">Act as substitute</label>
+    <select id="substitute-select"><option value="">Select a substitute</option></select>
+    <p class="muted">Choose an uncovered window, then adjust its start/end if covering only part. To cancel coverage, select its assigned substitute. To shorten an absence, select its teacher above.</p>
     <div id="absences-board-container">
-      <p style="color: #6b7280; font-size: 0.9rem;">TODO: Display absences and allow a Substitute to claim open shifts.</p>
+      <p class="muted">Loading absences…</p>
     </div>
   </div>
-
-  <script>
-    async function loadUsers() {
-      const res = await fetch('/api/users');
-      const users = await res.json();
-      const tbody = document.getElementById('users-tbody');
-      tbody.innerHTML = users.map(u => `
-        <tr>
-          <td>${u.id}</td>
-          <td>${u.name}</td>
-          <td><span class="badge badge-${u.role}">${u.role}</span></td>
-        </tr>
-      `).join('');
-    }
-    loadUsers();
-  </script>
+  </fieldset>
 </body>
 </html>

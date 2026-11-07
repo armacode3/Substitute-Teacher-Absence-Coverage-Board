@@ -264,6 +264,10 @@ See `DESIGN_REVIEW.md` for prospective failure scenarios, test recommendations, 
 
 ## 5. Implementation Checkpoint
 
-Database/API milestone implemented in `src/db.js`, `src/app.js`, `src/coverage.js`, `src/validation.js`, and `src/errors.js`. The frontend remains the starter shell and will be connected in the next milestone.
+Database/API milestone implemented in `src/db.js`, `src/app.js`, `src/coverage.js`, `src/validation.js`, and `src/errors.js` (commit `2e19f21`). Frontend implemented in `public/index.html` and deferred vanilla `public/app.js`; no frontend framework or build step. JSDOM is a dev-only test dependency.
 
-Verification: 84 automated tests pass (72 API, 3 gap scan, 9 file-backed concurrency/persistence), including a shuffled-order run. Separate-process tests use independent SQLite connections; trigger-injected failures verify complete rollback for merges, claims, cancellations, and early return. Mermaid syntax is validated for all three diagrams. Browser rendering and end-to-end UI behavior are not yet verified.
+The UI provides teacher/substitute selectors, creation/merge feedback, all coverage statuses, assignments and multiple gaps, explicit selected-range claims, cancellation/early-return confirmations, informational credentials, local-time/UTC-offset previews, and last-update/refresh controls. It renders untrusted text with DOM text APIs and preserves actors/edited claim ranges across refreshes. One client operation is pending at a time. Network failures/invalid responses/timeouts never automatically retry a write; a failed reload disables mutations until refresh succeeds.
+
+Prefilled gap inputs retain their original ISO instant while unchanged, avoiding the ambiguous-DST-fold loss that would occur when converting local text back to a date. User-edited local dates are checked for calendar/DST normalization. Manually entered ambiguous times use the browser's earlier occurrence, made visible by the offset preview; no separate fold picker is included.
+
+Verification: **108 automated tests pass** (72 API, 3 gap scan, 9 file-backed concurrency/persistence, 24 frontend DOM/API). Independent-process tests verify competing writers and coherent reads; trigger failures verify rollback. All three Mermaid diagrams pass syntax validation. An isolated Chromium run verified desktop/mobile, full lifecycle flows, two-page conflicts, committed-response loss, and New York DST behavior with no uncaught page errors. See `DEMO.md` for a walkthrough and tooling limits.

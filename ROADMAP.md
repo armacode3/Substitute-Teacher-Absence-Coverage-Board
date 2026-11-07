@@ -20,14 +20,14 @@ The README suggests a roughly 60-minute exercise. Favor correctness and a small 
 | `src/db.js` | SQLite schema for users, absences, assignments, and certifications; foreign keys, row checks, indexes, bounded busy timeout, and five original seeded users. Supports explicit path, `DB_PATH`, or `school.db`. |
 | `src/coverage.js` | Transactional scheduling service, snapshot reads, merge closure, linear gap calculation, lifecycle operations, and derived response data. |
 | `src/validation.js`, `src/errors.js` | Strict ISO/ID/body validation, millisecond normalization, and business errors. |
-| `public/index.html` | Inline CSS and JavaScript; displays seeded users. Absence form and coverage board are placeholders. |
-| `tests/api.test.js`, `tests/coverage.test.js`, `tests/concurrency.test.js` | 84 tests covering API behavior, gaps, rollback, persistence, and separate-process concurrency. Temporary data is cleaned up and connections closed. |
+| `public/index.html`, `public/app.js` | Build-free HTML/vanilla JS; directory/credentials, creation, coverage/gaps, explicit claims, lifecycle controls, timezone previews, pending state, and refresh recovery. |
+| `tests/api.test.js`, `tests/coverage.test.js`, `tests/concurrency.test.js`, `tests/frontend.test.js` | 108 tests covering API, gaps, rollback, persistence, separate-process concurrency, and DOM interactions against the API. Temporary data/connections are cleaned up. |
 | `ARCHITECTURE.md` | Reviewed ERD, create/merge and claim flows, three genuine design corrections, finalized contracts, and implementation checkpoint. |
 | `AI_LOG.md` | Real planning prompts, review corrections, implementation findings, and test evidence. |
 
 Request flow: browser → Express routes → synchronous `better-sqlite3` queries → SQLite → JSON response → browser rendering. No frontend build, authentication, ORM, or external service is present or needed for the stated task.
 
-Original baseline: one seeded-user test passed. Current verification: 84 tests pass, including shuffled order. No new project dependencies were needed. Git is on `main`; `.gitignore` excludes dependencies, generated SQLite databases/sidecars, local environment files, and logs. Architecture milestone: `512f9ab`.
+Original baseline: one seeded-user test passed. Current verification: 108 tests pass. JSDOM was added only as a test dependency; no runtime dependencies/frameworks were added. Isolated Chromium checks cover real browser workflows and desktop/mobile layout. Git is on `main`; `.gitignore` excludes runtime data/dependencies. Architecture milestone: `512f9ab`; backend milestone: `2e19f21`.
 
 ## Design choices to discuss
 
@@ -53,7 +53,7 @@ Original baseline: one seeded-user test passed. Current verification: 84 tests p
 
 Julian-day storage is another valid SQLite option, but offers no scheduling advantage here. ISO input/output and numeric storage are complementary choices, not competing formats for the same layer.
 
-Timezone-less API input is rejected under the approved explicit-offset contract; the frontend will convert local inputs first and clearly display the timezone. Ended absence/coverage windows cannot be claimed; in-progress windows with a future end are allowed. Historical absence creation remains allowed.
+Timezone-less API input is rejected; the frontend converts local inputs and displays timezone/offsets. Unchanged prefilled gaps retain exact ISO instants across DST folds, and invalid local DST times are rejected. Ended windows cannot be claimed; in-progress windows with a future end are allowed. Historical absence creation remains allowed.
 
 ### 3. Atomic claiming
 
@@ -72,7 +72,7 @@ Timezone-less API input is rejected under the approved explicit-offset contract;
 
 Keep authentication, full audit history, notifications, pagination, travel buffers, availability/workload rules, and UI redesign deferred. Certifications are informational, without eligibility enforcement or invented seeded credentials. Breaks use separate absence windows rather than inferred lunch periods. Selecting a user ID simulates an actor; role validation is not authentication. The user deprioritized reason-privacy features, not basic safe input/output handling.
 
-**Approved:** layered enforcement boundaries. Database constraints, backend validation, transactional conflict checks, and parameterized SQL are implemented; safe text rendering is required in the next UI milestone. Cross-row enforcement is in the API, without database triggers; these controls do not substitute for authentication/authorization.
+**Approved:** database constraints, backend validation, transactional checks, parameterized SQL, and safe DOM text rendering are implemented. Cross-row enforcement is in the API, without triggers; these controls do not substitute for authentication/authorization.
 
 ## Proposed API contract
 
@@ -165,4 +165,4 @@ Additional reliability checks if time permits:
 
 ## Current next action
 
-Architecture and database/API milestones are complete. Commit the tested backend change set, then connect the minimal frontend: teacher form, assignments/gaps board, explicit-range claiming, cancellation, early return, certification metadata, timezone display, pending controls, and refresh-based recovery. Browser and end-to-end checks remain to do.
+Architecture, backend, and frontend are implemented and tested; the verified UI change set is the third feature milestone. Next: the user's final walkthrough and deliverable review using `DEMO.md`. Note the six existing dev-tool audit findings (production-only audit is zero); do not force-upgrade without separate review. Submission cleanup/packaging remains gated on user approval.

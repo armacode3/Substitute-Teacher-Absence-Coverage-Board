@@ -6,7 +6,7 @@
 
 ## 2. Session Transcripts / Key Prompts
 
-Key prompts and decisions from this session are recorded below rather than claiming a transcript export or share link exists. Implementation and testing entries will be added as that work happens.
+Key prompts, decisions, and verification from this session are recorded below rather than claiming a transcript export or share link exists.
 
 ### Planning and architecture review
 
@@ -29,11 +29,21 @@ Key prompts and decisions from this session are recorded below rather than claim
 - Before application changes: `npm test` passed the existing seeded-users test (1 test).
 - Architecture/document edits: `git diff --check` passed. After the user's syntax report, all three diagrams passed Mermaid 11 `parse()` validation (ERD, create/merge flowchart, claim sequence). Used JSDOM for the flowchart's DOM-dependent text sanitization. This validates syntax, not visual browser rendering; tools were installed only in `/tmp/opencode/aps-mermaid-11XweJ`, not project dependencies.
 - Architecture committed before application code: `512f9ab`, `docs: finalize reviewed scheduling architecture`.
-- Implemented four-table schema; strict timestamp/ID/body validation; transactional create/merge/list/claim/cancel/early-return service; certification metadata; and consistent JSON errors. Kept the existing dependencies and CommonJS style. UI implementation remains next.
+- Implemented four-table schema; strict timestamp/ID/body validation; transactional create/merge/list/claim/cancel/early-return service; certification metadata; and consistent JSON errors. Kept the existing runtime dependencies and CommonJS style. Backend milestone: `2e19f21`.
 - First API/gap suite: 71 tests passed. Added independent child-process workers against a temporary file-backed database: 80 tests passed, including nine concurrency/persistence scenarios.
 - Final robustness pass added tests for accumulated reasons, post-write trigger failures, and pre-epoch/expanded-year timestamps. `npm test -- --sequence.shuffle --sequence.seed=20261107`: **84 tests passed in 3 files** (72 API, 3 gap, 9 concurrency/persistence).
 - Concurrency tests cover same-time claims, substitute double-booking across absences, adjacent split claims, merge/claim, cancel/claim, early-return/claim, coherent read snapshots during shortening, lock timeout/recovery, and database reopening. Temporary worker processes/connections/files are cleaned up.
 - Rollback tests inject SQLite trigger failures after intermediate mutations for merging, claiming, cancellation, and early return. Assertions verify unchanged dates/reasons/assignments and sanitized errors.
+
+### Frontend implementation and verification
+
+- User: "if all the tests are passing and everything is correctly implemented following the architecutre then lets move on to the frontend". Connected the reviewed API without changing backend behavior or adding a frontend framework/build step.
+- `public/index.html` retains the existing styling with small responsive/disabled-state additions; `public/app.js` contains the vanilla DOM/event/fetch behavior. Implemented actor selectors, forms, all statuses/assignments/gaps, explicit selected-range claims, cancellations/early return, credentials, timezone/offset previews, safe text rendering, draft preservation, and pending/recovery states.
+- Added dev-only JSDOM and `tests/frontend.test.js`. Fetch calls are bridged to the actual Express/in-memory SQLite API, not a fake business-logic implementation. Initial 22 cases passed; two additional timeout/non-JSON recovery cases bring the UI count to 24.
+- `npm test` and `npm test -- --sequence.shuffle --sequence.seed=20261107`: **108 tests passed in 4 files** (72 API, 3 gap, 9 concurrency/persistence, 24 frontend). Final Chromium smoke and all three Mermaid parser checks also passed after the last UI change. Whitespace validation passed with `git -c core.whitespace=cr-at-eol diff --check`, respecting the inherited lockfile line endings.
+- Installed Playwright/Chromium only under `/tmp/opencode/aps-browser-UGqW6a`, outside project dependencies. Command: `PLAYWRIGHT_BROWSERS_PATH=/tmp/opencode/aps-browser-UGqW6a/browsers node /tmp/opencode/aps-browser-UGqW6a/smoke.cjs`, run from the project folder. The temporary script launches the real HTTP app with an in-memory DB and deterministic clock, and closes all resources afterward.
+- Chromium 158 smoke results: desktop/mobile create → split → full coverage; safe markup-like text and credential display; cancellation reopening a middle gap; early return removing later assignments; stale conflicting claims in two pages; a committed write whose HTTP response is deliberately lost with no automatic retry; New York later DST-fold preservation and spring-forward rejection. All passed, with no uncaught browser JavaScript errors. Desktop/mobile screenshots were inspected and live only in the temporary validation directory, not the submission.
+- Dependency checks: six findings in the existing Vitest/Vite dev-tool chain (3 moderate, 1 high, 2 critical). `npm audit --omit=dev` reports zero findings. No unrelated major/force upgrades were applied; this limitation is documented in `DEMO.md`.
 
 ## 3. Edge Cases & Course Corrections
 
@@ -46,4 +56,8 @@ Key prompts and decisions from this session are recorded below rather than claim
 - **Implementation review correction:** a four-digit-only timestamp parser could return an expanded-year ISO string after offset normalization near year zero, then reject that same value on the next request. Extended parsing to signed six-digit years, bounded dates to JavaScript's representable range in the API and schema, and added round-trip/pre-epoch regressions. This was identified during code review; no prior failing test run is claimed.
 - **Scalability detail:** avoided spreading all merge candidates into `Math.min`/`Math.max` function arguments, which can hit JavaScript argument limits; use reductions. Kept the clear indexed overlap query and defensive closure expansion rather than adding an unmeasured custom interval index.
 
-The frontend remains the starter shell. Browser rendering, UI recovery, and end-to-end interaction results are not yet claimed.
+- **Frontend review correction:** comparing two separate `Date.now()` calls could make a blank "return now" cutoff appear to be in the past between calls. Capture the browser clock once and use the server's now default; an advancing-clock regression test verifies it.
+- **Browser-discovered defect:** all initial DOM tests passed, but Chromium at 375px found page-wide horizontal overflow from the staff grid's intrinsic card width. Diagnosed overflowing element bounds and added `min-width: 0` to the existing card rule. The full browser scenario passed after the fix; table overflow is confined to its scroll wrapper.
+- **DST safeguard:** converting a prefilled later-fold gap into timezone-less local text and reparsing it could select the earlier occurrence. Preserve the original ISO instant while its input remains unchanged, including across refreshes; display the offset preview for edits. DOM/API and real-browser tests verify the later occurrence is not shifted.
+
+Browser checks cover Chromium desktop/mobile emulation, not every browser/device. Full authentication, production security, credential verification, and dependency-toolchain upgrades remain outside the agreed feature scope. Final user walkthrough and submission cleanup are still pending approval.

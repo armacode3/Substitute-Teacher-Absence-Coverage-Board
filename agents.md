@@ -27,8 +27,8 @@ README also requires milestone Git commits and final packaging including `.git`,
 - `src/db.js`: SQLite users/absences/assignments/certifications, FK/row/JSON constraints, indexes, 1-second busy timeout. Five original users; no fabricated credentials. Explicit path → `DB_PATH` → `school.db` fallback.
 - `src/coverage.js`: immediate write transactions, coherent batched read transactions, merge closure, linear gaps, lifecycle changes, response serialization.
 - `src/validation.js`, `src/errors.js`: strict IDs/bodies/calendar timestamps, millisecond truncation, and business errors.
-- `public/index.html`: single-file vanilla UI. Only staff-directory loading works.
-- Tests: `tests/api.test.js` (72), `tests/coverage.test.js` (3), `tests/concurrency.test.js` (9). `tests/helpers/api-worker.cjs` exercises real independent processes/file-backed connections; temporary files/processes are cleaned up.
+- `public/index.html`, `public/app.js`: functional build-free vanilla UI: directory/credentials, teacher form, assignments/gaps, explicit-range claims, lifecycle actions, timezone previews, preserved drafts, and pending/refresh recovery.
+- Tests: API (72), gap (3), concurrency (9), frontend DOM/API (24): 108 total. `tests/helpers/api-worker.cjs` exercises independent processes/file-backed connections. JSDOM is the only added dev dependency; no runtime dependencies/frameworks were added.
 - `package.json`: `npm start`, `npm run dev`, `npm test`; no frontend build.
 
 ## Completed work
@@ -45,13 +45,14 @@ README also requires milestone Git commits and final packaging including `.git`,
 - Latest review: user approved lowest-ID merge survival and structural integrity boundaries, questioned rejection of finer timestamp precision, and reported a Mermaid parse error. Reproduced that exact parse error with an isolated Mermaid 11 package under `/tmp/opencode/aps-mermaid-11XweJ`; replaced the final claim note's semicolon with "and". Updated precision policy to accept validated finer fractions and truncate to milliseconds, with normalized-window validation.
 - Added `DESIGN_REVIEW.md` after the user requested a broader risk/use-case review. It records prospective stale-intent, concurrent-write, gap/merge, timezone/precision, retry, input/storage risks, plus product and production limitations. These findings are not implemented bugs or automatically approved scope additions.
 - Risk-review decisions: every claim requires explicit start/end; reject ended requested windows; show timezone; prevent duplicate clicks and recover unknown network outcomes. User requested cancellation and teacher early return, prioritizing concurrency and rollback. Subsequent approval settled lightweight informational certifications and separate absence windows for breaks; full audits/security/privacy features remain deferred, not basic safe validation/rendering.
-- Architecture committed as `512f9ab` before application code. Database/API and tests are now complete; frontend remains next. Final contract/defaults are in `ARCHITECTURE.md`, superseding the historical pending-choice notes below.
+- Architecture committed as `512f9ab`; backend committed as `2e19f21`. Frontend and 24 new DOM/API tests are complete. Final contract is in `ARCHITECTURE.md`; guided user review in `DEMO.md`.
 
 ## Validation
 
-- Baseline: 1 original test passed. Current: **84 tests pass**, including `npm test -- --sequence.shuffle --sequence.seed=20261107`. Three files cover API/normalization/rollback, gap scans, and separate-process contention/persistence. Connections/files are cleaned up; test clock is deterministic.
-- All three Mermaid diagrams pass Mermaid 11 syntax validation, using JSDOM for flowchart sanitization. Validation tools live only under `/tmp/opencode/aps-mermaid-11XweJ`; no project dependencies were added. Browser/UI checks have not happened.
-- Final `npm test`: 84 passed; shuffled-order run also passed. `git diff --check` and all Mermaid syntax checks passed. Architecture commit: `512f9ab`; baseline: `99650d2`. This change set is the backend milestone (`feat: implement transactional absence coverage API`); check Git log for its resulting hash.
+- Baseline: 1 original test. Final normal and shuffled runs (`--sequence.shuffle --sequence.seed=20261107`) both pass **108 tests**. In-memory/temporary data and workers are cleaned up; clocks are deterministic. Final Chromium smoke and all three Mermaid syntax checks passed after the last UI change.
+- All three Mermaid diagrams passed syntax validation (tools only in `/tmp/opencode/aps-mermaid-11XweJ`). Chromium smoke passed desktop/mobile workflows, lifecycle actions, two-page conflicts, committed-response loss, and New York DST, with no uncaught page errors. Isolated browser tools/script/screenshots are in `/tmp/opencode/aps-browser-UGqW6a`; they are not project dependencies. Inspect `AI_LOG.md` for the command and evidence.
+- Use `git -c core.whitespace=cr-at-eol diff --check`: npm preserved the original lockfile's CRLF endings, which otherwise appear as trailing whitespace. No broad lockfile reformat was done.
+- Audit: zero production findings (`npm audit --omit=dev`), six existing Vitest/Vite dev-tool findings including critical. No force upgrades. Do not expose development/test servers or run untrusted tests; a toolchain upgrade needs separate review.
 - Dependencies are already installed.
 - Git is initialized on `main`; use `git log` and `git status` to verify the current commit history and working tree. No remote has been configured by this session.
 - Verified ignore rules with `git check-ignore` for dependencies, database/sidecar paths, and `.env`. The initial staged whitespace check flags inherited CRLF/trailing whitespace in starter files; preserve that baseline rather than reformat unrelated files during Git setup.
@@ -90,9 +91,9 @@ README also requires milestone Git commits and final packaging including `.git`,
 ## Current milestone and next steps
 
 1. Architecture committed before application code as `512f9ab` (`docs: finalize reviewed scheduling architecture`). Baseline is `99650d2`.
-2. Database/API milestone verified: full 84-test suite passes; `AI_LOG.md` and architecture/risk/roadmap documents are current. Check Git status/log before further work; the frontend is the next milestone.
-3. Next: connect `public/index.html` to the API: teacher form, reasons, all coverage states/assignments/gaps, explicit selected-range claims, cancel/early-return controls, certification metadata, timezone/offset display, pending buttons, and refresh-based recovery. Render text safely. No extra CSS framework/dependencies needed.
-4. Verify browser/end-to-end flows, update logs/context, commit the UI milestone, and review deliverables. Submission cleanup/packaging still requires user confirmation; do not delete dependencies or databases now.
+2. Backend and frontend are complete. This verified change set is the UI milestone (`feat: connect coverage portal frontend`); check Git log/status for its resulting commit. All final test/browser/diagram checks pass. Documents are current and `DEMO.md` provides a user walkthrough.
+3. Ask the user to review the running demo and final deliverables. No additional scope or force dependency upgrades without approval. Browser timezone is explicit; manual repeated times choose the earlier occurrence, while unchanged prefilled gap instants retain their exact offset.
+4. Submission cleanup/packaging still requires user confirmation. Do not delete dependencies/data or zip the project yet; preserve hidden `.git` and milestone history when approved.
 
 ## Important correctness reminders
 
