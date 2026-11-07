@@ -4,13 +4,18 @@
   let actorUpdaters = [];
   const formatter = new Intl.DateTimeFormat(undefined, {
     year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit',
-    second: '2-digit', timeZoneName: 'longOffset', hour12: false
+    second: '2-digit', timeZoneName: 'longOffset', hour12: true
   });
   const instant = value => formatter.format(new Date(value));
   const range = (start, end) => `${instant(start)} → ${instant(end)}`;
   const teacherId = () => Number($('teacher-select').value);
   const substituteId = () => Number($('substitute-select').value);
   const canAct = () => !state.busy && state.fresh && state.loaded;
+
+  function clockLabel(value, seconds = false) {
+    const [hour, minute, second = '00'] = value.split(':');
+    return `${Number(hour) % 12 || 12}:${minute}${seconds ? `:${second}` : ''} ${Number(hour) >= 12 ? 'PM' : 'AM'}`;
+  }
 
   function node(tag, text, className) {
     const element = document.createElement(tag);
@@ -118,10 +123,21 @@
     slots.id = `${id}-time`;
     for (let minute = 0; minute < 24 * 60; minute += 15) {
       const text = `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
-      slots.add(new Option(text, `${text}:00`));
+      slots.add(new Option(clockLabel(`${text}:00`), `${text}:00`));
     }
     const exact = node('input');
-    Object.assign(exact, { id: `${id}-exact`, type: 'time', step: '1', hidden: true, disabled: true });
+    Object.assign(exact, {
+      id: `${id}-exact`, type: 'text', placeholder: 'hh:mm:ss', hidden: true, disabled: true,
+      pattern: '(0?[1-9]|1[0-2]):[0-5][0-9]:[0-5][0-9]', maxLength: 8
+    });
+    exact.dataset.exactTime = '';
+    const period = node('select');
+    period.id = `${id}-period`;
+    period.setAttribute('aria-label', `${label}: AM or PM`);
+    period.add(new Option('AM', 'AM'));
+    period.add(new Option('PM', 'PM'));
+    const exactControls = node('div', undefined, 'exact-time');
+    exactControls.append(exact, period);
     const timeLabel = node('label', 'Time (15-minute choices)');
     timeLabel.htmlFor = slots.id;
     const actions = node('div', undefined, 'time-actions');
@@ -134,19 +150,32 @@
     clear.type = 'button';
     clear.setAttribute('aria-label', `Clear ${label}`);
     actions.append(edit, clear);
-    timePart.append(timeLabel, slots, exact);
+    timePart.append(timeLabel, slots, exactControls);
     row.append(datePart, timePart);
     group.append(input, row, actions);
     form.append(group);
     let custom = false;
     const fullTime = value => /^\d{2}:\d{2}$/.test(value) ? `${value}:00` : value;
 
+    function setExact(value) {
+      const [hour, minute, second = '00'] = (value || '00:00:00').split(':');
+      exact.value = `${String(Number(hour) % 12 || 12).padStart(2, '0')}:${minute}:${second}`;
+      period.value = Number(hour) >= 12 ? 'PM' : 'AM';
+    }
+
+    function exactValue() {
+      const match = exact.value.match(/^(0?[1-9]|1[0-2]):([0-5]\d):([0-5]\d)$/);
+      if (!match) return '';
+      const hour = Number(match[1]) % 12 + (period.value === 'PM' ? 12 : 0);
+      return `${String(hour).padStart(2, '0')}:${match[2]}:${match[3]}`;
+    }
+
     function ensureSlot(value) {
       for (const option of [...slots.options]) {
         if (option.dataset.custom) option.remove();
       }
       if (value && ![...slots.options].some(option => option.value === value)) {
-        const option = new Option(`${value} (exact)`, value);
+        const option = new Option(`${clockLabel(value, true)} (exact)`, value);
         option.dataset.custom = 'true';
         slots.add(option);
       }
@@ -159,15 +188,18 @@
       slots.disabled = custom;
       exact.hidden = !custom;
       exact.disabled = !custom;
+      exactControls.hidden = !custom;
+      period.hidden = !custom;
+      period.disabled = !custom;
       input.dataset.timeMode = custom ? 'exact' : 'slots';
-      timeLabel.textContent = custom ? 'Exact time (hours, minutes, seconds)' : 'Time (15-minute choices)';
+      timeLabel.textContent = custom ? 'Exact time (hh:mm:ss and AM/PM)' : 'Time (15-minute choices)';
       timeLabel.htmlFor = custom ? exact.id : slots.id;
       edit.textContent = custom ? 'Use 15-minute choices' : 'Edit exact time';
       edit.setAttribute('aria-expanded', String(custom));
     }
 
     function sync(edited = false) {
-      const time = fullTime(custom ? exact.value : slots.value);
+      const time = custom ? exactValue() : fullTime(slots.value);
       // Optional early-return fields mean "now" only when truly empty. A user
       // selecting a nonzero/exact time must also explicitly choose its date.
       date.required = required || custom || time !== '00:00:00';
@@ -175,6 +207,8 @@
       input.value = date.value && time ? `${date.value}T${time}` : '';
       input.dataset.dateValue = date.value;
       input.dataset.timeValue = time;
+      input.dataset.exactValue = exact.value;
+      input.dataset.periodValue = period.value;
       if (edited) {
         delete input.dataset.sourceIso;
         delete input.dataset.sourceValue;
@@ -183,18 +217,31 @@
     }
 
     function syncFromValue() {
+      const incomplete = !input.value;
       const [day, time] = input.value ? input.value.split('T')
         : [input.dataset.dateValue || '', input.dataset.timeValue ?? '00:00:00'];
       date.value = day;
       ensureSlot(fullTime(time));
-      exact.value = fullTime(time);
+      setExact(fullTime(time));
       setMode(input.dataset.timeMode === 'exact');
+      if (incomplete && custom) {
+        exact.value = input.dataset.exactValue ?? exact.value;
+        period.value = input.dataset.periodValue || 'AM';
+      }
       sync();
     }
 
     function toggle() {
-      if (!custom) exact.value = slots.value || '00:00:00';
-      else ensureSlot(fullTime(exact.value));
+      if (!custom) setExact(slots.value);
+      else {
+        const time = exactValue();
+        if (!time) {
+          exact.reportValidity();
+          notice('Enter a valid 12-hour time as hh:mm:ss and choose AM or PM before switching editors.', 'error');
+          return;
+        }
+        ensureSlot(time);
+      }
       setMode(!custom);
       sync(); // Changing editor alone must not reinterpret a prefilled DST fold.
       (custom ? exact : slots).focus();
@@ -204,9 +251,10 @@
     date.addEventListener('input', () => sync(true));
     slots.addEventListener('change', () => sync(true));
     exact.addEventListener('input', () => sync(true));
+    period.addEventListener('change', () => sync(true));
     function reset() {
       date.value = '';
-      exact.value = '00:00:00';
+      setExact('00:00:00');
       ensureSlot('00:00:00');
       setMode(false);
       sync(true);
@@ -239,6 +287,8 @@
     input.dataset.timeMode = saved.timeMode || 'slots';
     input.dataset.dateValue = saved.dateValue || '';
     input.dataset.timeValue = saved.timeValue ?? '00:00:00';
+    input.dataset.exactValue = saved.exactValue ?? '12:00:00';
+    input.dataset.periodValue = saved.periodValue || 'AM';
     input.timeControl.syncFromValue();
   }
 

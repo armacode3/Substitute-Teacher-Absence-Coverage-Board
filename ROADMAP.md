@@ -21,13 +21,13 @@ The README suggests a roughly 60-minute exercise. Favor correctness and a small 
 | `src/coverage.js` | Transactional scheduling service, snapshot reads, merge closure, linear gap calculation, lifecycle operations, and derived response data. |
 | `src/validation.js`, `src/errors.js` | Strict ISO/ID/body validation, millisecond normalization, and business errors. |
 | `public/index.html`, `public/app.js` | Build-free HTML/vanilla JS; directory/credentials, creation, coverage/gaps, explicit claims, lifecycle controls, timezone previews, pending state, and refresh recovery. |
-| `tests/api.test.js`, `tests/coverage.test.js`, `tests/concurrency.test.js`, `tests/frontend.test.js` | 118 tests covering API, gaps, rollback, persistence, separate-process concurrency, and DOM interactions/time controls. Temporary data/connections are cleaned up. |
+| `tests/api.test.js`, `tests/coverage.test.js`, `tests/concurrency.test.js`, `tests/frontend.test.js` | 131 tests covering API, gaps, rollback, persistence, concurrency, DOM interactions, and AM/PM time controls. Temporary data/connections are cleaned up. |
 | `ARCHITECTURE.md` | Reviewed ERD, create/merge and claim flows, three genuine design corrections, finalized contracts, and implementation checkpoint. |
 | `AI_LOG.md` | Real planning prompts, review corrections, implementation findings, and test evidence. |
 
 Request flow: browser → Express routes → synchronous `better-sqlite3` queries → SQLite → JSON response → browser rendering. No frontend build, authentication, ORM, or external service is present or needed for the stated task.
 
-Original baseline: one seeded-user test passed. Current verification: 118 tests pass. JSDOM is test-only; no runtime frameworks were added. Chromium checks cover browser workflows, revised time pickers, and desktop/mobile. Git milestones: architecture `512f9ab`, backend `2e19f21`, initial UI `fa00773`; the current time-control refinement is a subsequent user-requested change.
+Original baseline: one seeded-user test. Current verification: 131 tests pass. JSDOM is test-only; no runtime frameworks were added. Chromium checks cover workflows, AM/PM controls, and desktop/mobile. Git milestones: architecture `512f9ab`, backend `2e19f21`, initial UI `fa00773`, quarter-hour controls `d21495c`; AM/PM is the latest user-requested refinement.
 
 ## Design choices to discuss
 
@@ -43,7 +43,7 @@ Original baseline: one seeded-user test passed. Current verification: 118 tests 
 
 ### 2. Time representation and interval semantics
 
-**Approved API contract:** validate explicit-offset ISO timestamps, store integer UTC milliseconds, and return canonical ISO. **Revised UI:** separate blank dates and midnight-default 15-minute choices, with double-click/button editing to whole seconds; no visible milliseconds. User-entered values are converted to ISO; unchanged chosen gap bounds retain original API precision internally. The backend still accepts finer fractions and truncates to milliseconds as agreed.
+**Approved API contract:** explicit-offset ISO, integer UTC milliseconds, canonical ISO output. **UI:** blank dates and 12:00 AM-default 15-minute choices, labeled with a 12-hour clock. Double-click/button editing uses whole-second hh:mm:ss and explicit AM/PM, with no visible milliseconds. Unchanged chosen gap bounds retain API precision internally; backend normalization is unchanged.
 - Validate actual calendar dates, not just a permissive `Date.parse` result, and require end > start.
 - Validate full input before truncation; check duration/containment/conflicts after normalization. Reject a positive sub-millisecond window if both endpoints collapse to the same millisecond. Returning normalized values makes the loss of sub-millisecond precision explicit; this is not lossless archival storage.
 - **Approved:** treat windows as half-open: `[start, end)`. Back-to-back substitute shifts are allowed, and adjacent teacher absences remain separate.

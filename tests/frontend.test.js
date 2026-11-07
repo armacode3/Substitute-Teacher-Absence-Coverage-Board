@@ -72,6 +72,13 @@ describe('frontend DOM integration with the real API', () => {
       }
       return;
     }
+    if (element.matches('input[data-exact-time]')) {
+      const [hour, ...rest] = value.split(':');
+      const period = $(`${element.id.replace(/-exact$/, '')}-period`);
+      period.value = Number(hour) >= 12 ? 'PM' : 'AM';
+      period.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+      value = `${String(Number(hour) % 12 || 12).padStart(2, '0')}:${rest.join(':')}`;
+    }
     element.value = value;
     element.dispatchEvent(new dom.window.Event(event, { bubbles: true }));
   }
@@ -501,7 +508,7 @@ describe('frontend DOM integration with the real API', () => {
     fill('absence-end-date', '2030-01-15');
     $('absence-start-time').dispatchEvent(new dom.window.MouseEvent('dblclick', { bubbles: true }));
     expect($('absence-start-exact').hidden).toBe(false);
-    expect($('absence-start-exact').step).toBe('1');
+    expect($('absence-start-exact').pattern).toContain('1[0-2]');
     fill('absence-start-exact', '09:07:37');
     $('absence-end').closest('.date-time').querySelector('[data-action="edit-time"]').click();
     fill('absence-end-exact', '09:12:05');
@@ -566,7 +573,7 @@ describe('frontend DOM integration with the real API', () => {
     select('teacher-select', 1);
     fill('absence-start', '2030-01-15T09:07:37.125');
     fill('absence-end', '2030-01-15T10:00');
-    expect($('absence-start-exact').validity.stepMismatch).toBe(true);
+    expect($('absence-start-exact').validity.patternMismatch).toBe(true);
     submit($('absence-form'));
     expect(posts()).toHaveLength(0);
   });
@@ -596,6 +603,84 @@ describe('frontend DOM integration with the real API', () => {
     expect($(`return-end-${absence.id}-date`).required).toBe(true);
     expect($(`claim-start-${absence.id}-exact`).value).toBe('09:07:37');
     expect($(`claim-start-${absence.id}-exact`).hidden).toBe(false);
+    submit(form('return', absence.id));
+    expect(posts()).toHaveLength(0);
+  });
+
+  it('labels every time choice and displayed range with a twelve-hour clock and AM/PM', async () => {
+    await create(1, at(13), at(16));
+    await mount();
+    const slots = $('absence-start-time');
+    expect(slots.options[0].text).toBe('12:00 AM');
+    expect(slots.options[48].text).toBe('12:00 PM');
+    expect(slots.options[53].text).toBe('1:15 PM');
+    expect(slots.options[95].text).toBe('11:45 PM');
+    expect(doc.querySelector('article').textContent).toMatch(/01:00:00\s*PM/);
+    expect(slots.value).toBe('00:00:00'); // canonical values are internal only
+  });
+
+  it.each([
+    ['12:00:00', 'AM', '00:00:00'], ['12:00:00', 'PM', '12:00:00'],
+    ['01:07:37', 'AM', '01:07:37'], ['01:07:37', 'PM', '13:07:37'],
+    ['11:59:59', 'PM', '23:59:59']
+  ])('converts an explicit %s %s selection correctly', async (time, period, expected) => {
+    await mount();
+    select('teacher-select', 1);
+    fill('absence-start-date', '2030-01-15');
+    $('absence-start').closest('.date-time').querySelector('[data-action="edit-time"]').click();
+    $('absence-start-exact').value = time;
+    $('absence-start-exact').dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+    select('absence-start-period', period);
+    fill('absence-end-date', '2030-01-16');
+    submit($('absence-form'));
+    await idle();
+    expect(payload().start_time).toBe(`2030-01-15T${expected}.000Z`);
+  });
+
+  it.each(['00:15:00', '13:15:00', '12:60:00', '12:00:60', '1:07'])('rejects invalid twelve-hour text (%s)', async text => {
+    await mount();
+    select('teacher-select', 1);
+    fill('absence-start-date', '2030-01-15');
+    $('absence-start').closest('.date-time').querySelector('[data-action="edit-time"]').click();
+    $('absence-start-exact').value = text;
+    $('absence-start-exact').dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+    fill('absence-end', '2030-01-16T00:00');
+    expect($('absence-start-exact').validity.patternMismatch).toBe(true);
+    submit($('absence-form'));
+    expect(posts()).toHaveLength(0);
+  });
+
+  it('preserves a PM exact-time draft across refresh and converts it on claim', async () => {
+    const absence = await create();
+    await mount();
+    chooseGap(absence.id);
+    fill(form('claim', absence.id).elements.start_time, '2030-01-15T13:07:37');
+    $('refresh-button').click();
+    await idle();
+    expect($(`claim-start-${absence.id}-exact`).value).toBe('01:07:37');
+    expect($(`claim-start-${absence.id}-period`).value).toBe('PM');
+    select('substitute-select', 4);
+    submit(form('claim', absence.id));
+    await idle();
+    expect(payload().start_time).toBe('2030-01-15T13:07:37.000Z');
+  });
+
+  it('preserves incomplete twelve-hour text and PM on refresh without rounding or returning now', async () => {
+    const absence = await create();
+    await mount();
+    select('teacher-select', 1);
+    const id = `return-end-${absence.id}`;
+    $(id).closest('.date-time').querySelector('[data-action="edit-time"]').click();
+    $(`${id}-exact`).value = '1:';
+    $(`${id}-exact`).dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+    select(`${id}-period`, 'PM');
+    // Switching editors must not coerce invalid/incomplete text to midnight.
+    $(id).closest('.date-time').querySelector('[data-action="edit-time"]').click();
+    expect($(`${id}-exact`).hidden).toBe(false);
+    $('refresh-button').click();
+    await idle();
+    expect($(`${id}-exact`).value).toBe('1:');
+    expect($(`${id}-period`).value).toBe('PM');
     submit(form('return', absence.id));
     expect(posts()).toHaveLength(0);
   });

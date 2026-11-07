@@ -53,6 +53,13 @@ Key prompts, decisions, and verification from this session are recorded below ra
 - Revised DOM tests drive visible controls, not hidden timestamp values. Added midnight/blank defaults, quarter-hour selection, second editing, no snapping, overnight boundaries, draft preservation, API precision, and partial early-return validation. `npm test` and the shuffled run (`--sequence.shuffle --sequence.seed=20261107`) both pass **118 tests** (34 frontend, 84 backend/gap/concurrency). CRLF-aware whitespace validation also passed.
 - Updated/reran isolated Chromium smoke: real double-click seconds entry, exact payload, midnight reset, no displayed milliseconds, desktop/mobile width, lifecycle actions, two-page conflicts, lost committed response, and New York DST all passed with no uncaught page errors. No dependencies were added for this revision.
 
+### User-requested AM/PM refinement
+
+- User: "Can you add a PM AM option so the user doesn't have to translate into miliatary time". Time choices/previews/board now use 12-hour labels; the exact editor uses hh:mm:ss text plus an explicit AM/PM selector rather than relying on native time-input locale settings.
+- Midnight stays the zero-time default, displayed as 12:00 AM; noon is 12:00 PM. Canonical 24-hour/ISO values remain internal; no API/storage/dependency changes. Invalid or incomplete exact text cannot be silently switched/rounded into midnight. AM/PM and raw incomplete text survive refresh.
+- Frontend suite: 47 cases pass. Normal and shuffled full runs (`--sequence.shuffle --sequence.seed=20261107`) both pass **131 tests**. Added midnight/noon/AM/PM, invalid 00/13-hour/minute/second text, and PM/incomplete draft regressions. Whitespace check passed.
+- Isolated Chromium smoke also passed: midnight/noon labels, explicit AM default, real double-click input, and an exact **1:30:05 PM** early return verified as 13:30:05 UTC in the UTC test context. Desktop/mobile, lifecycle/conflict/lost-response, and New York DST checks remain passing with no page errors.
+
 ## 3. Edge Cases & Course Corrections
 
 - **Design blind spot, not a reported runtime bug:** the original nullable substitute column could not represent split coverage. The assistant also proposed deferring split coverage after introducing an assignments table; the user requested real split coverage now. The revised design uses timed assignments and checks both substitute availability and whether the selected absence portion is already covered. Merely allowing multiple assignment rows would not prevent double coverage or detect gaps.

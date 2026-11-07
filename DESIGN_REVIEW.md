@@ -2,7 +2,7 @@
 
 ## Status
 
-This began as a prospective design review. The full feature now has 118 automated tests, including rollback, separate-process concurrency, and frontend DOM/API/time-control interactions. Chromium checks verified workflows, revised pickers, stale conflicts, lost responses, mobile layout, and DST. This is not a claim that every production use case is supported. Final contracts are in `ARCHITECTURE.md`; walkthrough in `DEMO.md`.
+This began as a prospective design review. The feature has 131 tests including rollback, concurrency, DOM/API behavior, and AM/PM controls. Chromium verifies workflows, explicit PM conversion, stale conflicts, lost responses, mobile layout, and DST. This is not a claim of full production coverage. Contracts are in `ARCHITECTURE.md`; walkthrough in `DEMO.md`.
 
 ## High-priority correctness scenarios
 

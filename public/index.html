@@ -33,6 +33,7 @@
     .date-time legend { font-size: 0.85rem; font-weight: 600; }
     .date-time-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0.75rem; }
     .date-time-row input, .date-time-row select { min-width: 0; }
+    .exact-time { display: grid; grid-template-columns: minmax(0, 1fr) 5rem; gap: 0.5rem; }
     .time-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
     .time-actions button { width: auto; font-size: 0.8rem; margin-top: 0.5rem; }
     [hidden] { display: none !important; }
@@ -72,7 +73,7 @@
           <select id="teacher-select" name="teacher_id" required><option value="">Select a teacher</option></select>
           <div id="absence-start-container"></div>
           <div id="absence-end-container"></div>
-          <p class="muted">Times start at 00:00. Choose a 15-minute time slot, or double-click the time / use Edit exact time to enter seconds. Dates are not preselected.</p>
+          <p class="muted">Times start at 12:00 AM (midnight). Choose a 15-minute time slot, or double-click the time / use Edit exact time to enter seconds and select AM or PM. Dates are not preselected.</p>
           <label for="absence-reason">Reason or subject (optional)</label>
           <textarea id="absence-reason" name="reason" rows="3" maxlength="2000"></textarea>
           <p id="absence-preview" class="muted" aria-live="polite">Select start and end times to preview their UTC offsets.</p>
