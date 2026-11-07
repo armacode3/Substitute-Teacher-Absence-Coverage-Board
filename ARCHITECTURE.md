@@ -79,6 +79,8 @@ The API returns canonical ISO timestamp strings. Browser `datetime-local` inputs
 
 **Revised precision policy:** accept otherwise valid ISO timestamps with more than three fractional-second digits and truncate the fractional part to milliseconds before storage, comparison, and response serialization. For example, `2026-11-07T09:00:00.123456Z` becomes `2026-11-07T09:00:00.123Z`. Validate the complete input's syntax, calendar values, and timezone before discarding any digits; truncation must not rescue malformed input. No fractional part, one digit, or two digits can be represented exactly at millisecond precision.
 
+The parser accepts calendar timestamps with seconds, four-digit or signed six-digit years, and an explicit colon-separated UTC offset or `Z`. Leap seconds, timezone-less/date-only inputs, and values outside JavaScript's representable date range are rejected. SQL timestamp checks enforce integer values within that same date range. Truncating fractional digits before offset conversion also works correctly for pre-epoch dates.
+
 Truncation deliberately discards sub-millisecond information; preserving that information would require higher-precision storage or retaining the original input as well. Return canonical normalized timestamps so the chosen resolution is visible. Check positive duration, assignment containment, and overlaps **after normalization**. A valid positive sub-millisecond interval can collapse to equal endpoints: reject that unrepresentable zero-duration interval with `400`, rather than inventing a longer window. Never compare raw mixed-offset strings or accept ambiguous timezone-less API timestamps.
 
 **Approved:** intervals are half-open (`[start, end)`), so a shift ending at 10:00 does not conflict with one starting at 10:00. Adjacent teacher absences remain separate. Overlap exists when:
@@ -259,3 +261,9 @@ Authentication and full audit history remain deferred; the user deprioritized re
 ## 4. Risk Review and Unsupported Real-World Uses
 
 See `DESIGN_REVIEW.md` for prospective failure scenarios, test recommendations, algorithm complexity, and production limits. The stale optional-time claim shortcut has been removed following user review. Other recommendations are not automatically approved beyond the goals recorded above.
+
+## 5. Implementation Checkpoint
+
+Database/API milestone implemented in `src/db.js`, `src/app.js`, `src/coverage.js`, `src/validation.js`, and `src/errors.js`. The frontend remains the starter shell and will be connected in the next milestone.
+
+Verification: 84 automated tests pass (72 API, 3 gap scan, 9 file-backed concurrency/persistence), including a shuffled-order run. Separate-process tests use independent SQLite connections; trigger-injected failures verify complete rollback for merges, claims, cancellations, and early return. Mermaid syntax is validated for all three diagrams. Browser rendering and end-to-end UI behavior are not yet verified.

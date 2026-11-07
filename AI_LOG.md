@@ -20,7 +20,7 @@ Key prompts and decisions from this session are recorded below rather than claim
 - Revised design: timed assignment records, derived partial/full coverage and gaps, no overlapping coverage within an absence, no overlapping substitute assignments globally, and merge rejection whenever any affected absence has even partial coverage.
 - The user approved retaining the lowest existing ID during merges and the structural integrity boundaries. They challenged rejecting valid timestamps with more than millisecond precision; the revised policy accepts them with explicit fractional-second truncation and revalidates normalized intervals.
 - The user requested stepping back to examine unhandled real-world cases and failure modes. Added `DESIGN_REVIEW.md` distinguishing prospective correctness risks from unsupported product/production use cases. A key new finding is stale intent: an ID-only claim could cover an expanded merge-survivor window the substitute never saw. Explicit submitted times limit that risk; stricter request/version policies remain for discussion.
-- Latest user review approved required explicit times for every claim, ended-window rejection, visible timezone, duplicate-click/network recovery, and concurrency/rollback priority. The user requested substitute cancellation and teacher early return, while deferring full audits and reason-privacy features. Certification and breaks are under discussion. Documented linear gap scanning, indexed overlap-lookup tradeoffs, read snapshots, and proposed lifecycle mechanics; no feature code has been written.
+- At the risk-review stage, the user approved required claim times, ended-window rejection, visible timezone, duplicate-click/network recovery, and concurrency/rollback priority. They requested cancellation and early return while deferring full audits and reason-privacy features. Certification/breaks were then still under discussion. Documented gap scanning, indexed lookup tradeoffs, read snapshots, and lifecycle proposals before feature code.
 
 ### Implementation and verification
 
@@ -28,7 +28,12 @@ Key prompts and decisions from this session are recorded below rather than claim
 
 - Before application changes: `npm test` passed the existing seeded-users test (1 test).
 - Architecture/document edits: `git diff --check` passed. After the user's syntax report, all three diagrams passed Mermaid 11 `parse()` validation (ERD, create/merge flowchart, claim sequence). Used JSDOM for the flowchart's DOM-dependent text sanitization. This validates syntax, not visual browser rendering; tools were installed only in `/tmp/opencode/aps-mermaid-11XweJ`, not project dependencies.
-- No absence/assignment application code or new integration tests have been written yet. Add actual results here during implementation.
+- Architecture committed before application code: `512f9ab`, `docs: finalize reviewed scheduling architecture`.
+- Implemented four-table schema; strict timestamp/ID/body validation; transactional create/merge/list/claim/cancel/early-return service; certification metadata; and consistent JSON errors. Kept the existing dependencies and CommonJS style. UI implementation remains next.
+- First API/gap suite: 71 tests passed. Added independent child-process workers against a temporary file-backed database: 80 tests passed, including nine concurrency/persistence scenarios.
+- Final robustness pass added tests for accumulated reasons, post-write trigger failures, and pre-epoch/expanded-year timestamps. `npm test -- --sequence.shuffle --sequence.seed=20261107`: **84 tests passed in 3 files** (72 API, 3 gap, 9 concurrency/persistence).
+- Concurrency tests cover same-time claims, substitute double-booking across absences, adjacent split claims, merge/claim, cancel/claim, early-return/claim, coherent read snapshots during shortening, lock timeout/recovery, and database reopening. Temporary worker processes/connections/files are cleaned up.
+- Rollback tests inject SQLite trigger failures after intermediate mutations for merging, claiming, cancellation, and early return. Assertions verify unchanged dates/reasons/assignments and sanitized errors.
 
 ## 3. Edge Cases & Course Corrections
 
@@ -38,4 +43,7 @@ Key prompts and decisions from this session are recorded below rather than claim
 - **Actual documentation bug found by the user:** the claim sequence failed Mermaid parsing at its final note. Reproduced the exact line-49 parse error using an isolated Mermaid 11 installation outside the project. The semicolon inside the note was treated as a statement separator, leaving the rest as invalid diagram syntax. Replaced it with "and"; the corrected claim sequence and both other diagrams now pass parser validation.
 - **Precision correction:** the assistant initially proposed rejecting any fraction longer than milliseconds. The user questioned discarding an otherwise usable timestamp. Accept and truncate extra fractional digits after validating the complete timestamp, expose normalized values in responses, and reject intervals that collapse to zero duration. Truncation discards sub-millisecond information; it does not preserve the original timestamp exactly.
 
-No application implementation bug has been observed yet; the user-reported Mermaid syntax bug is a reproduced documentation defect. Record application bugs and test-driven fixes here as development proceeds.
+- **Implementation review correction:** a four-digit-only timestamp parser could return an expanded-year ISO string after offset normalization near year zero, then reject that same value on the next request. Extended parsing to signed six-digit years, bounded dates to JavaScript's representable range in the API and schema, and added round-trip/pre-epoch regressions. This was identified during code review; no prior failing test run is claimed.
+- **Scalability detail:** avoided spreading all merge candidates into `Math.min`/`Math.max` function arguments, which can hit JavaScript argument limits; use reductions. Kept the clear indexed overlap query and defensive closure expansion rather than adding an unmeasured custom interval index.
+
+The frontend remains the starter shell. Browser rendering, UI recovery, and end-to-end interaction results are not yet claimed.

@@ -2,7 +2,7 @@
 
 ## Status
 
-This is a review of the proposed architecture, not a report of implemented application bugs. The absence/assignment feature has not been coded; the only existing integration test covers seeded users. Recommendations here are not automatically user-approved scope changes.
+This began as a review of the proposed architecture, not a report of implemented bugs. The reviewed database/API is now implemented and passes 84 tests, including injected-failure rollback and separate-process concurrency cases. The frontend is not yet connected. The scenarios below remain useful as a risk checklist; they are not claims that every production use case is supported. Final contracts/defaults are in `ARCHITECTURE.md`.
 
 ## High-priority correctness scenarios
 
@@ -29,7 +29,7 @@ Checks and writes must be inside the same immediate transaction. Separate-connec
 
 Begin the transaction before any mutation; commit only after all operations succeed, otherwise roll back. A rollback is not a backup or a preliminary operation performed before merging. The same discipline must apply to newly requested cancellation and early-return writes. Test cancel-versus-claim and early-return-versus-claim races, not only merges.
 
-Define a deliberate lock-contention response (for example, bounded busy timeout followed by a retryable `503`), without mapping every SQLite error to `409` or exposing raw errors. This operational status is a recommendation, not yet an agreed API addition.
+Implemented lock policy: a one-second busy timeout followed by retryable `503` with `Retry-After: 1`. Do not map every SQLite failure to `409` or expose raw errors. Separate-process tests verify no write on timeout and success after lock release.
 
 ### 3. Missing coverage hidden by status logic
 
@@ -97,12 +97,12 @@ The user approved visible timezone, duplicate-click prevention, recovery after a
 
 | Use case | Current limitation / future direction |
 | --- | --- |
-| Substitute cancels or becomes sick | Now requested. Proposed: release a future assignment, or just the remaining portion of an in-progress assignment; retain elapsed coverage. Review exact endpoint/retry behavior. |
-| Teacher returns early or changes a covered absence | Now requested as an explicit operation: shorten the absence, truncate crossing assignments, remove later assignments, atomically. Ordinary protected-overlap merging remains forbidden. |
-| Claiming a past or already-started shift | Ended claims are now prohibited. Check requested end and absence end against one injected server clock. In-progress start policy remains open; historical absence entry is not prohibited. |
+| Substitute cancels or becomes sick | Implemented: release a future assignment, or only the remaining portion of an ongoing one; retain elapsed coverage. Ended assignments cannot be cancelled. A retry after a full deletion returns `404`; refresh instead of blindly retrying. |
+| Teacher returns early or changes a covered absence | Implemented explicit shortening: preserve earlier assignments, truncate crossing ones, remove later ones, atomically. Omitted cutoff means now; no backdating or extension. Ordinary protected-overlap merging remains forbidden. |
+| Claiming a past or already-started shift | Ended requested windows and absences are rejected against an injected server clock. In-progress windows are allowed if their end is future; historical absence creation remains allowed. |
 | Lunch breaks or separate teaching periods | The model treats the whole absence interval as needing continuous coverage. Excluding non-teaching periods requires explicit coverage requirements or separate windows. |
 | Travel between schools | Back-to-back assignments are allowed. Locations and travel buffers are not modeled. |
-| Qualifications, availability, workload | User is interested in certification; display versus enforced eligibility/expiry is still open. Availability/workload rules remain deferred. Do not infer qualifications from display names. |
+| Qualifications, availability, workload | Informational certification metadata is stored and returned with users; expiry is displayed, not enforced for eligibility. No invented credentials or management/verification UI. Availability/workload engines remain deferred. |
 | A teacher also serves as a substitute | Existing users have one role; true dual roles need a revised role model and conflict rules. |
 | Recurring absences / district timezone | No recurrence engine or named school timezone; storing UTC alone is insufficient for future local-time recurrence. |
 | Auditing original submissions | Merges preserve reasons, not original records/time-to-reason mappings. Counts represent consolidated windows, not incidents or submitted forms. |
@@ -118,7 +118,7 @@ The user approved visible timezone, duplicate-click prevention, recovery after a
 
 ## Suggested priority
 
-1. Stale-claim times and expired-window rejection are resolved. Review proposed in-progress cancellation, teacher cutoff mechanics, and consistent read/network recovery; turn concurrency/rollback/interval cases into tests.
-2. Break recommendation: use separate absence windows around known breaks. Do not guess breaks from a continuous 09:00–16:00 request. A teaching-period calendar or required-coverage windows model would be a separate extension.
-3. Certification recommendation: if added, start with a small substitute-certification relation (user, credential, optional expiry). This is modest metadata, unlike a complete availability/workload engine. Clarify whether it is display-only or a claim requirement; enforcement additionally needs absence requirements, verification, and expiry policies.
-4. Finalize scope before application code: cancellation and early return are now requested extensions, while recurrence, travel buffers, availability/workload limits, authentication, and full audits remain deferred.
+1. Core backend interval/concurrency/rollback protections are implemented and tested. Connect UI controls with explicit times, visible timezone, pending states, and refresh-based recovery; manually exercise real browser behavior.
+2. Use separate absence windows around known breaks. Do not guess breaks from a continuous 09:00–16:00 request. A teaching-period calendar or required-coverage windows model would be a separate extension.
+3. Certifications remain informational metadata, not proof of verification or enforced eligibility. No availability/workload engine is included.
+4. Keep recurrence, travel buffers, authentication, full audits, and whole-absence cancellation before its start deferred.

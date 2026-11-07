@@ -16,16 +16,18 @@ The README suggests a roughly 60-minute exercise. Favor correctness and a small 
 | File | Current responsibility |
 | --- | --- |
 | `src/server.js` | Starts Express on `PORT` or port 3000. |
-| `src/app.js` | Creates the app and database, serves `public/`, exposes `GET /api/users` with optional role filtering. Absence endpoints are TODOs. |
-| `src/db.js` | Opens SQLite, enables foreign keys, creates `users`, and seeds three teachers and two substitutes if the table is empty. Supports an explicit database path, `DB_PATH`, or a default `school.db`. |
+| `src/app.js` | Creates the app/database, serves `public/`, exposes user/create/list/claim/cancel/early-return routes, and provides structured JSON errors. |
+| `src/db.js` | SQLite schema for users, absences, assignments, and certifications; foreign keys, row checks, indexes, bounded busy timeout, and five original seeded users. Supports explicit path, `DB_PATH`, or `school.db`. |
+| `src/coverage.js` | Transactional scheduling service, snapshot reads, merge closure, linear gap calculation, lifecycle operations, and derived response data. |
+| `src/validation.js`, `src/errors.js` | Strict ISO/ID/body validation, millisecond normalization, and business errors. |
 | `public/index.html` | Inline CSS and JavaScript; displays seeded users. Absence form and coverage board are placeholders. |
-| `tests/api.test.js` | Vitest + Supertest; creates an in-memory app for each test. One seeded-user test exists. |
-| `ARCHITECTURE.md` | Proposed ERD, create/merge and claim flows, and actual review corrections; overall design still under review. |
-| `AI_LOG.md` | Planning tooling/prompts and genuine design course corrections recorded; implementation/testing evidence remains to add. |
+| `tests/api.test.js`, `tests/coverage.test.js`, `tests/concurrency.test.js` | 84 tests covering API behavior, gaps, rollback, persistence, and separate-process concurrency. Temporary data is cleaned up and connections closed. |
+| `ARCHITECTURE.md` | Reviewed ERD, create/merge and claim flows, three genuine design corrections, finalized contracts, and implementation checkpoint. |
+| `AI_LOG.md` | Real planning prompts, review corrections, implementation findings, and test evidence. |
 
 Request flow: browser → Express routes → synchronous `better-sqlite3` queries → SQLite → JSON response → browser rendering. No frontend build, authentication, ORM, or external service is present or needed for the stated task.
 
-Baseline: `npm test` passes (1 test). Dependencies are already installed. Git has been initialized on `main` with user approval; `.gitignore` excludes dependencies, generated SQLite databases/sidecars, local environment files, and logs.
+Original baseline: one seeded-user test passed. Current verification: 84 tests pass, including shuffled order. No new project dependencies were needed. Git is on `main`; `.gitignore` excludes dependencies, generated SQLite databases/sidecars, local environment files, and logs. Architecture milestone: `512f9ab`.
 
 ## Design choices to discuss
 
@@ -51,7 +53,7 @@ Baseline: `npm test` passes (1 test). Dependencies are already installed. Git ha
 
 Julian-day storage is another valid SQLite option, but offers no scheduling advantage here. ISO input/output and numeric storage are complementary choices, not competing formats for the same layer.
 
-Timezone-less API input is rejected under the approved explicit-offset contract; the browser converts local inputs first and clearly displays the timezone. Ended absence/coverage windows cannot be claimed; an in-progress start policy remains to settle. Historical absence creation has not been prohibited.
+Timezone-less API input is rejected under the approved explicit-offset contract; the frontend will convert local inputs first and clearly display the timezone. Ended absence/coverage windows cannot be claimed; in-progress windows with a future end are allowed. Historical absence creation remains allowed.
 
 ### 3. Atomic claiming
 
@@ -70,7 +72,7 @@ Timezone-less API input is rejected under the approved explicit-offset contract;
 
 Keep authentication, full audit history, notifications, pagination, travel buffers, availability/workload rules, and UI redesign deferred. Certifications are informational, without eligibility enforcement or invented seeded credentials. Breaks use separate absence windows rather than inferred lunch periods. Selecting a user ID simulates an actor; role validation is not authentication. The user deprioritized reason-privacy features, not basic safe input/output handling.
 
-**Approved:** layered enforcement boundaries. Use database constraints, backend validation, transactional conflict checks, parameterized SQL, and safe text rendering. Exact trigger coverage remains open; these controls do not substitute for production authentication/authorization.
+**Approved:** layered enforcement boundaries. Database constraints, backend validation, transactional conflict checks, and parameterized SQL are implemented; safe text rendering is required in the next UI milestone. Cross-row enforcement is in the API, without database triggers; these controls do not substitute for authentication/authorization.
 
 ## Proposed API contract
 
@@ -80,9 +82,9 @@ Keep the existing `/api/users` endpoint.
 | --- | --- | --- |
 | `POST /api/absences` | `{ teacher_id, start_time, end_time, reason? }`; returns resulting absence | Approved: `201` created / `200` merged; `400` invalid input; `409` for same-teacher overlap involving claimed coverage |
 | `GET /api/absences` | Array with teacher name, reasons, timestamps, derived status, assignments/substitute names, and uncovered windows | `200`, including `[]` when empty |
-| `POST /api/absences/:id/claim` | `{ substitute_id, start_time, end_time }`, both times required; returns updated absence with assignments | `200`; `400` invalid input/role/out-of-bounds window; `404` missing absence; `409` overlapping coverage, substitute schedule, or expired window (proposed expiry status) |
+| `POST /api/absences/:id/claim` | `{ substitute_id, start_time, end_time }`, both times required; returns updated absence with assignments | `200`; `400` invalid input/role/out-of-bounds window; `404` missing absence; `409` overlapping coverage, substitute schedule, or expired window |
 
-The user approved the proposed HTTP response codes. Finalize exact response fields, status casing, validation order, and consistent JSON error shape before implementation. Return joined display data rather than requiring the browser to assemble relationships.
+Responses are implemented with joined display data, `Open` / `Partially Covered` / `Claimed` status, assignments, and uncovered windows. JSON errors are `{ error: { code, message } }`. Additional lifecycle and operational responses are documented in `ARCHITECTURE.md`.
 
 **Approved:** require explicit start/end on every claim; remove the whole-current-absence shortcut. Never silently claim multiple gaps or trim/expand requested windows. The UI allows claims on Open and Partially Covered records with non-expired requested windows.
 
@@ -163,4 +165,4 @@ Additional reliability checks if time permits:
 
 ## Current next action
 
-Architecture review is complete. Validate/commit the architecture milestone, then implement the database/API with tests for split coverage, simple indexed merging, linear gaps, cancellations, early return, certifications, rollback, expiry, and separate-connection concurrency. Leave UI work for the following milestone.
+Architecture and database/API milestones are complete. Commit the tested backend change set, then connect the minimal frontend: teacher form, assignments/gaps board, explicit-range claiming, cancellation, early return, certification metadata, timezone display, pending controls, and refresh-based recovery. Browser and end-to-end checks remain to do.
