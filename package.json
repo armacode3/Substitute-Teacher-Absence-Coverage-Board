@@ -1,0 +1,18 @@
+{
+  "name": "sub-coverage-assessment",
+  "version": "1.0.0",
+  "description": "Take-home assessment for Substitute Teacher Absence & Coverage",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "express": "^4.21.0"
+  },
+  "devDependencies": {
+    "supertest": "^7.0.0",
+    "vitest": "^2.1.0"
+  }
+}

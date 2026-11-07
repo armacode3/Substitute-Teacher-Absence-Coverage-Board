@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Oakridge School District - Sub Coverage Portal</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; color: #1f2937; background: #f9fafb; }
+    h1, h2 { color: #111827; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 1.25rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    table { width: 100%; border-collapse: collapse; margin-top: 0.75rem; font-size: 0.9rem; }
+    th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #e5e7eb; }
+    .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+    .badge-teacher { background: #dbeafe; color: #1e40af; }
+    .badge-substitute { background: #fef3c7; color: #92400e; }
+    label { display: block; font-size: 0.85rem; font-weight: 600; margin-top: 0.75rem; }
+    input, select, button { width: 100%; padding: 0.5rem; margin-top: 0.25rem; box-sizing: border-box; border: 1px solid #d1d5db; border-radius: 4px; }
+    button { background: #2563eb; color: white; font-weight: 600; border: none; cursor: pointer; margin-top: 1rem; }
+    button:hover { background: #1d4ed8; }
+  </style>
+</head>
+<body>
+  <h1>Oakridge School District — Absence & Sub Coverage</h1>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Staff Directory (Seeded)</h2>
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Name</th><th>Role</th></tr>
+        </thead>
+        <tbody id="users-tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Log Teacher Absence</h2>
+      <div id="absence-form-container">
+        <p style="color: #6b7280; font-size: 0.9rem;">TODO: Build form to create an absence.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Absence & Coverage Board</h2>
+    <div id="absences-board-container">
+      <p style="color: #6b7280; font-size: 0.9rem;">TODO: Display absences and allow a Substitute to claim open shifts.</p>
+    </div>
+  </div>
+
+  <script>
+    async function loadUsers() {
+      const res = await fetch('/api/users');
+      const users = await res.json();
+      const tbody = document.getElementById('users-tbody');
+      tbody.innerHTML = users.map(u => `
+        <tr>
+          <td>${u.id}</td>
+          <td>${u.name}</td>
+          <td><span class="badge badge-${u.role}">${u.role}</span></td>
+        </tr>
+      `).join('');
+    }
+    loadUsers();
+  </script>
+</body>
+</html>
