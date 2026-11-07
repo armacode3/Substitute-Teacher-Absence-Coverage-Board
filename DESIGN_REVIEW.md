@@ -2,7 +2,7 @@
 
 ## Status
 
-This began as a prospective design review. The full feature is now implemented with 108 automated tests, including rollback, separate-process concurrency, and frontend DOM/API interactions. Isolated Chromium checks verified real workflows, stale conflicts, committed-response loss, mobile layout, and DST. The checklist is not a claim that every production use case is supported. Final contracts/defaults are in `ARCHITECTURE.md`; walkthrough in `DEMO.md`.
+This began as a prospective design review. The full feature now has 118 automated tests, including rollback, separate-process concurrency, and frontend DOM/API/time-control interactions. Chromium checks verified workflows, revised pickers, stale conflicts, lost responses, mobile layout, and DST. This is not a claim that every production use case is supported. Final contracts are in `ARCHITECTURE.md`; walkthrough in `DEMO.md`.
 
 ## High-priority correctness scenarios
 
@@ -72,7 +72,7 @@ With the appropriate index this is approximately `O(log t + m)` retrieval for `t
 - Truncate extra fractional-second digits consistently on every endpoint; validate normalized duration/containment/conflicts afterward.
 - Test intervals collapsing to zero milliseconds and conflicts that disappear/change at the chosen millisecond resolution. This is a deliberate precision limit, not exact preservation of sub-millisecond instants.
 - Allow overnight and multi-day absences without assuming start/end share a calendar date.
-- Browser `datetime-local` has no timezone. During daylight-saving transitions a local time can be nonexistent or occur twice; naive conversion can silently shift or ambiguously select it. At minimum display the interpreted timezone/offset and detect nonexistent-time normalization. Explicit fold selection or a school IANA timezone is a possible future requirement.
+- Browser-local date/time fields have no timezone. During daylight-saving transitions a local time can be nonexistent or occur twice; naive conversion can shift/select it ambiguously. The UI displays timezone/offsets and rejects nonexistent times. Unchanged explicitly chosen gaps preserve exact instants internally even though milliseconds are hidden. Manual edits use whole seconds and the earlier ambiguous occurrence; explicit fold selection or school IANA timezone remains a future requirement.
 - UTC timestamps locate instants but do not retain the original named timezone. Recurring school-local schedules need additional timezone modeling.
 
 ### 6. Network failures and retries

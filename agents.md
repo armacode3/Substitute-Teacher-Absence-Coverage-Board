@@ -28,7 +28,7 @@ README also requires milestone Git commits and final packaging including `.git`,
 - `src/coverage.js`: immediate write transactions, coherent batched read transactions, merge closure, linear gaps, lifecycle changes, response serialization.
 - `src/validation.js`, `src/errors.js`: strict IDs/bodies/calendar timestamps, millisecond truncation, and business errors.
 - `public/index.html`, `public/app.js`: functional build-free vanilla UI: directory/credentials, teacher form, assignments/gaps, explicit-range claims, lifecycle actions, timezone previews, preserved drafts, and pending/refresh recovery.
-- Tests: API (72), gap (3), concurrency (9), frontend DOM/API (24): 108 total. `tests/helpers/api-worker.cjs` exercises independent processes/file-backed connections. JSDOM is the only added dev dependency; no runtime dependencies/frameworks were added.
+- Tests: API (72), gap (3), concurrency (9), frontend DOM/API (34): 118 total. `tests/helpers/api-worker.cjs` exercises independent processes/file-backed connections. JSDOM is test-only; no dependencies were added for the time-picker refinement.
 - `package.json`: `npm start`, `npm run dev`, `npm test`; no frontend build.
 
 ## Completed work
@@ -46,10 +46,11 @@ README also requires milestone Git commits and final packaging including `.git`,
 - Added `DESIGN_REVIEW.md` after the user requested a broader risk/use-case review. It records prospective stale-intent, concurrent-write, gap/merge, timezone/precision, retry, input/storage risks, plus product and production limitations. These findings are not implemented bugs or automatically approved scope additions.
 - Risk-review decisions: every claim requires explicit start/end; reject ended requested windows; show timezone; prevent duplicate clicks and recover unknown network outcomes. User requested cancellation and teacher early return, prioritizing concurrency and rollback. Subsequent approval settled lightweight informational certifications and separate absence windows for breaks; full audits/security/privacy features remain deferred, not basic safe validation/rendering.
 - Architecture committed as `512f9ab`; backend committed as `2e19f21`. Frontend and 24 new DOM/API tests are complete. Final contract is in `ARCHITECTURE.md`; guided user review in `DEMO.md`.
+- Original frontend milestone: `fa00773`. User-requested refinement now removes visible/input milliseconds, uses 15-minute slots starting at midnight with blank dates, and enables whole-second editing by double-click or accessible button. Claims explicitly choose a gap before any bounds fill. Partial/complete drafts and original unchanged API/DST instants are preserved. Backend contract is unchanged; docs and walkthrough reflect the new controls.
 
 ## Validation
 
-- Baseline: 1 original test. Final normal and shuffled runs (`--sequence.shuffle --sequence.seed=20261107`) both pass **108 tests**. In-memory/temporary data and workers are cleaned up; clocks are deterministic. Final Chromium smoke and all three Mermaid syntax checks passed after the last UI change.
+- Baseline: 1 original test. Current normal and shuffled runs (`--sequence.shuffle --sequence.seed=20261107`) both pass **118 tests** (34 frontend). Revised Chromium smoke passes real double-click/second editing, midnight defaults/resets, no visible milliseconds, desktop/mobile layout, workflows, conflicts, response loss, and DST. Whitespace check passed; all test data/workers are cleaned up.
 - All three Mermaid diagrams passed syntax validation (tools only in `/tmp/opencode/aps-mermaid-11XweJ`). Chromium smoke passed desktop/mobile workflows, lifecycle actions, two-page conflicts, committed-response loss, and New York DST, with no uncaught page errors. Isolated browser tools/script/screenshots are in `/tmp/opencode/aps-browser-UGqW6a`; they are not project dependencies. Inspect `AI_LOG.md` for the command and evidence.
 - Use `git -c core.whitespace=cr-at-eol diff --check`: npm preserved the original lockfile's CRLF endings, which otherwise appear as trailing whitespace. No broad lockfile reformat was done.
 - Audit: zero production findings (`npm audit --omit=dev`), six existing Vitest/Vite dev-tool findings including critical. No force upgrades. Do not expose development/test servers or run untrusted tests; a toolchain upgrade needs separate review.
@@ -89,6 +90,8 @@ README also requires milestone Git commits and final packaging including `.git`,
 - Breaks use separate absence windows; no inferred lunch period. Whole-absence cancellation before it starts, credential eligibility, travel buffers, availability/workload engines, full audit, authentication/privacy features remain deferred.
 
 ## Current milestone and next steps
+
+- Current change set: `feat: simplify date and time selection`; check Git log/status for its resulting commit. UI implementation, 118-test normal/shuffled runs, Chromium, and whitespace checks pass. No extra dependencies or backend changes. Blank optional early-return controls still mean server now; an edited time requires a date, so incomplete input cannot accidentally trigger it.
 
 1. Architecture committed before application code as `512f9ab` (`docs: finalize reviewed scheduling architecture`). Baseline is `99650d2`.
 2. Backend and frontend are complete. This verified change set is the UI milestone (`feat: connect coverage portal frontend`); check Git log/status for its resulting commit. All final test/browser/diagram checks pass. Documents are current and `DEMO.md` provides a user walkthrough.

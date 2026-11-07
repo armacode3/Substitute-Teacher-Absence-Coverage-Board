@@ -21,13 +21,13 @@ The README suggests a roughly 60-minute exercise. Favor correctness and a small 
 | `src/coverage.js` | Transactional scheduling service, snapshot reads, merge closure, linear gap calculation, lifecycle operations, and derived response data. |
 | `src/validation.js`, `src/errors.js` | Strict ISO/ID/body validation, millisecond normalization, and business errors. |
 | `public/index.html`, `public/app.js` | Build-free HTML/vanilla JS; directory/credentials, creation, coverage/gaps, explicit claims, lifecycle controls, timezone previews, pending state, and refresh recovery. |
-| `tests/api.test.js`, `tests/coverage.test.js`, `tests/concurrency.test.js`, `tests/frontend.test.js` | 108 tests covering API, gaps, rollback, persistence, separate-process concurrency, and DOM interactions against the API. Temporary data/connections are cleaned up. |
+| `tests/api.test.js`, `tests/coverage.test.js`, `tests/concurrency.test.js`, `tests/frontend.test.js` | 118 tests covering API, gaps, rollback, persistence, separate-process concurrency, and DOM interactions/time controls. Temporary data/connections are cleaned up. |
 | `ARCHITECTURE.md` | Reviewed ERD, create/merge and claim flows, three genuine design corrections, finalized contracts, and implementation checkpoint. |
 | `AI_LOG.md` | Real planning prompts, review corrections, implementation findings, and test evidence. |
 
 Request flow: browser → Express routes → synchronous `better-sqlite3` queries → SQLite → JSON response → browser rendering. No frontend build, authentication, ORM, or external service is present or needed for the stated task.
 
-Original baseline: one seeded-user test passed. Current verification: 108 tests pass. JSDOM was added only as a test dependency; no runtime dependencies/frameworks were added. Isolated Chromium checks cover real browser workflows and desktop/mobile layout. Git is on `main`; `.gitignore` excludes runtime data/dependencies. Architecture milestone: `512f9ab`; backend milestone: `2e19f21`.
+Original baseline: one seeded-user test passed. Current verification: 118 tests pass. JSDOM is test-only; no runtime frameworks were added. Chromium checks cover browser workflows, revised time pickers, and desktop/mobile. Git milestones: architecture `512f9ab`, backend `2e19f21`, initial UI `fa00773`; the current time-control refinement is a subsequent user-requested change.
 
 ## Design choices to discuss
 
@@ -43,7 +43,7 @@ Original baseline: one seeded-user test passed. Current verification: 108 tests 
 
 ### 2. Time representation and interval semantics
 
-**Approved:** accept strictly validated ISO timestamps containing `Z` or a numeric UTC offset; normalize to integer UTC Unix milliseconds in SQLite; return canonical ISO strings in the API. The browser converts `datetime-local` inputs to ISO before sending. Milliseconds were selected for JavaScript convenience; seconds would also have sufficient scheduling precision. Following user review, accept higher fractional precision and explicitly truncate to milliseconds, rather than reject valid timestamps solely for excess precision.
+**Approved API contract:** validate explicit-offset ISO timestamps, store integer UTC milliseconds, and return canonical ISO. **Revised UI:** separate blank dates and midnight-default 15-minute choices, with double-click/button editing to whole seconds; no visible milliseconds. User-entered values are converted to ISO; unchanged chosen gap bounds retain original API precision internally. The backend still accepts finer fractions and truncates to milliseconds as agreed.
 - Validate actual calendar dates, not just a permissive `Date.parse` result, and require end > start.
 - Validate full input before truncation; check duration/containment/conflicts after normalization. Reject a positive sub-millisecond window if both endpoints collapse to the same millisecond. Returning normalized values makes the loss of sub-millisecond precision explicit; this is not lossless archival storage.
 - **Approved:** treat windows as half-open: `[start, end)`. Back-to-back substitute shifts are allowed, and adjacent teacher absences remain separate.

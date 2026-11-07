@@ -58,10 +58,25 @@ describe('frontend DOM integration with the real API', () => {
   const $ = id => doc.getElementById(id);
   function fill(input, value, event = 'input') {
     const element = typeof input === 'string' ? $(input) : input;
+    if (element.matches('input[data-time-field]')) {
+      const [day, enteredTime = '00:00:00'] = value.split('T');
+      const time = enteredTime.length === 5 ? `${enteredTime}:00` : enteredTime;
+      fill(`${element.id}-date`, day);
+      const slots = $(`${element.id}-time`);
+      const exact = $(`${element.id}-exact`);
+      if (!slots.disabled && [...slots.options].some(option => option.value === time)) {
+        fill(slots, time, 'change');
+      } else {
+        if (exact.disabled) element.closest('.date-time').querySelector('[data-action="edit-time"]').click();
+        fill(exact, time);
+      }
+      return;
+    }
     element.value = value;
     element.dispatchEvent(new dom.window.Event(event, { bubbles: true }));
   }
   const select = (id, value) => fill(id, String(value), 'change');
+  const chooseGap = (id, index = 0) => select(`gap-${id}`, index);
   const form = (kind, id) => doc.querySelector(`form[data-kind="${kind}"][data-absence-id="${id}"]`);
   const submit = element => element.dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));
   const idle = () => vi.waitFor(() => expect($('refresh-button').disabled).toBe(false));
@@ -115,6 +130,7 @@ describe('frontend DOM integration with the real API', () => {
     expect($('notice').textContent).toContain('Created absence #1');
     expect($('teacher-select').value).toBe('1');
     expect($('absence-start').value).toBe('');
+    expect($('absence-start-time').value).toBe('00:00:00');
     expect(doc.querySelector('.reason').textContent).toContain('Personal leave');
   });
 
@@ -136,12 +152,14 @@ describe('frontend DOM integration with the real API', () => {
     const absence = await create();
     await mount();
     select('substitute-select', 4);
+    chooseGap(absence.id);
     fill(form('claim', absence.id).elements.end_time, '2030-01-15T12:00');
     submit(form('claim', absence.id));
     await idle();
     expect((await board())[0].status).toBe('Partially Covered');
     expect(doc.querySelector('article').textContent).toContain('David Kim (Sub)');
     select('substitute-select', 5);
+    chooseGap(absence.id);
     submit(form('claim', absence.id));
     await idle();
     expect(payload()).toEqual({ substitute_id: 5, start_time: at(12), end_time: at(16) });
@@ -174,6 +192,7 @@ describe('frontend DOM integration with the real API', () => {
   it('preserves edited claim ranges when switching actors or refreshing an expanded absence', async () => {
     const absence = await create(1, at(9), at(12));
     await mount();
+    chooseGap(absence.id);
     fill(form('claim', absence.id).elements.start_time, '2030-01-15T10:00');
     select('substitute-select', 4);
     select('substitute-select', 5);
@@ -198,6 +217,7 @@ describe('frontend DOM integration with the real API', () => {
     submit($('absence-form'));
     expect($('notice').textContent).toContain('End must be after start');
     select('substitute-select', 5);
+    chooseGap(absence.id);
     fill(form('claim', absence.id).elements.end_time, '2030-01-15T12:00');
     submit(form('claim', absence.id));
     expect($('notice').textContent).toContain('one current uncovered window');
@@ -208,7 +228,7 @@ describe('frontend DOM integration with the real API', () => {
     const absence = await create();
     await assign(absence.id, 4, 9, 12);
     await mount();
-    expect(form('claim', absence.id).querySelector('button').disabled).toBe(true);
+    expect(form('claim', absence.id).querySelector('button[type="submit"]').disabled).toBe(true);
     select('substitute-select', 5);
     expect(doc.querySelector('[data-action="cancel"]').hidden).toBe(true);
     select('substitute-select', 4);
@@ -271,6 +291,7 @@ describe('frontend DOM integration with the real API', () => {
       return bridge(path, options);
     };
     select('substitute-select', 4);
+    chooseGap(absence.id);
     const claim = form('claim', absence.id);
     submit(claim);
     submit(claim);
@@ -286,6 +307,7 @@ describe('frontend DOM integration with the real API', () => {
   it('refreshes a conflict response without automatically retrying the claim', async () => {
     const absence = await create();
     await mount();
+    chooseGap(absence.id);
     await assign(absence.id, 5, 9, 16);
     select('substitute-select', 4);
     submit(form('claim', absence.id));
@@ -301,6 +323,7 @@ describe('frontend DOM integration with the real API', () => {
     await create(1, at(9), at(10));
     const removed = await create(1, at(11), at(12));
     await mount();
+    chooseGap(removed.id);
     await request(app).post('/api/absences').send({ teacher_id: 1, start_time: at(9), end_time: at(12) });
     select('substitute-select', 4);
     submit(form('claim', removed.id));
@@ -319,6 +342,7 @@ describe('frontend DOM integration with the real API', () => {
       return response;
     };
     select('substitute-select', 4);
+    chooseGap(absence.id);
     submit(form('claim', absence.id));
     await idle();
     expect($('notice').textContent).toContain('may have succeeded');
@@ -342,6 +366,7 @@ describe('frontend DOM integration with the real API', () => {
       });
     };
     select('substitute-select', 4);
+    chooseGap(absence.id);
     submit(form('claim', absence.id));
     await idle();
     expect($('notice').textContent).toContain('may have succeeded');
@@ -357,6 +382,7 @@ describe('frontend DOM integration with the real API', () => {
       return bridge(path, options);
     };
     select('substitute-select', 4);
+    chooseGap(absence.id);
     submit(form('claim', absence.id));
     await idle();
     expect($('portal-controls').disabled).toBe(true);
@@ -428,6 +454,7 @@ describe('frontend DOM integration with the real API', () => {
     const absence = await create(1, '2026-11-01T06:30:00.000Z', '2026-11-01T07:30:00.000Z');
     await mount();
     select('substitute-select', 4);
+    chooseGap(absence.id);
     expect(form('claim', absence.id).elements.start_time.value).toContain('T01:30');
     $('refresh-button').click();
     await idle();
@@ -435,5 +462,141 @@ describe('frontend DOM integration with the real API', () => {
     await idle();
     expect(payload().start_time).toBe('2026-11-01T06:30:00.000Z');
     expect((await board())[0].status).toBe('Claimed');
+  });
+
+  it('starts with blank dates, midnight times, and 96 fifteen-minute choices rather than the current time', async () => {
+    const absence = await create();
+    await mount();
+    for (const id of ['absence-start', 'absence-end', `claim-start-${absence.id}`, `return-end-${absence.id}`]) {
+      expect($(`${id}-date`).value).toBe('');
+      expect($(`${id}-time`).value).toBe('00:00:00');
+      expect($(`${id}-time`).options).toHaveLength(96);
+      expect($(`${id}-exact`).hidden).toBe(true);
+    }
+    expect($(`gap-${absence.id}`).value).toBe('');
+    fill('absence-start-date', '2030-01-16');
+    expect($('absence-start').value).toBe('2030-01-16T00:00:00');
+    expect($('absence-start-time').value).toBe('00:00:00');
+  });
+
+  it('submits selected fifteen-minute slots without displaying milliseconds', async () => {
+    await mount();
+    select('teacher-select', 1);
+    fill('absence-start-date', '2030-01-15');
+    fill('absence-end-date', '2030-01-15');
+    select('absence-start-time', '09:15:00');
+    select('absence-end-time', '09:45:00');
+    submit($('absence-form'));
+    await idle();
+    expect(payload().start_time).toBe('2030-01-15T09:15:00.000Z');
+    expect(payload().end_time).toBe('2030-01-15T09:45:00.000Z');
+    expect(doc.body.textContent).not.toMatch(/\d{2}:\d{2}:\d{2}\.\d/);
+    expect(doc.querySelectorAll('input[type="datetime-local"]')).toHaveLength(0);
+  });
+
+  it('supports double-click and accessible button editing down to seconds', async () => {
+    await mount();
+    select('teacher-select', 1);
+    fill('absence-start-date', '2030-01-15');
+    fill('absence-end-date', '2030-01-15');
+    $('absence-start-time').dispatchEvent(new dom.window.MouseEvent('dblclick', { bubbles: true }));
+    expect($('absence-start-exact').hidden).toBe(false);
+    expect($('absence-start-exact').step).toBe('1');
+    fill('absence-start-exact', '09:07:37');
+    $('absence-end').closest('.date-time').querySelector('[data-action="edit-time"]').click();
+    fill('absence-end-exact', '09:12:05');
+    submit($('absence-form'));
+    await idle();
+    expect(payload().start_time).toBe('2030-01-15T09:07:37.000Z');
+    expect(payload().end_time).toBe('2030-01-15T09:12:05.000Z');
+  });
+
+  it('does not silently snap an exact time when switching back to slot choices', async () => {
+    await mount();
+    fill('absence-start', '2030-01-15T09:07:37');
+    const edit = $('absence-start').closest('.date-time').querySelector('[data-action="edit-time"]');
+    edit.click();
+    expect($('absence-start-time').value).toBe('09:07:37');
+    expect($('absence-start').value).toBe('2030-01-15T09:07:37');
+    select('absence-start-time', '09:15:00');
+    expect($('absence-start').value).toBe('2030-01-15T09:15:00');
+  });
+
+  it('allows an overnight interval ending at the midnight default', async () => {
+    await mount();
+    select('teacher-select', 1);
+    fill('absence-start-date', '2030-01-15');
+    select('absence-start-time', '23:45:00');
+    fill('absence-end-date', '2030-01-16');
+    submit($('absence-form'));
+    await idle();
+    expect(payload().end_time).toBe('2030-01-16T00:00:00.000Z');
+  });
+
+  it('preserves exact-second drafts and editor mode across refresh', async () => {
+    const absence = await create();
+    await mount();
+    chooseGap(absence.id);
+    fill(form('claim', absence.id).elements.start_time, '2030-01-15T09:07:37');
+    $('refresh-button').click();
+    await idle();
+    expect($(`claim-start-${absence.id}-exact`).hidden).toBe(false);
+    expect($(`claim-start-${absence.id}-exact`).value).toBe('09:07:37');
+    select('substitute-select', 4);
+    submit(form('claim', absence.id));
+    await idle();
+    expect(payload().start_time).toBe('2030-01-15T09:07:37.000Z');
+  });
+
+  it('preserves unchanged API gap precision without exposing millisecond controls', async () => {
+    const absence = await create(1, '2030-01-15T09:00:00.123Z', '2030-01-15T10:00:00.456Z');
+    await mount();
+    chooseGap(absence.id);
+    expect($(`claim-start-${absence.id}-time`).value).toBe('09:00:00');
+    expect(doc.body.textContent).not.toContain('09:00:00.123');
+    select('substitute-select', 4);
+    submit(form('claim', absence.id));
+    await idle();
+    expect(payload().start_time).toBe('2030-01-15T09:00:00.123Z');
+    expect(payload().end_time).toBe('2030-01-15T10:00:00.456Z');
+  });
+
+  it('rejects fractional seconds in the exact-time editor instead of submitting hidden precision', async () => {
+    await mount();
+    select('teacher-select', 1);
+    fill('absence-start', '2030-01-15T09:07:37.125');
+    fill('absence-end', '2030-01-15T10:00');
+    expect($('absence-start-exact').validity.stepMismatch).toBe(true);
+    submit($('absence-form'));
+    expect(posts()).toHaveLength(0);
+  });
+
+  it('requires a date for an edited early-return time instead of accidentally returning now', async () => {
+    const absence = await create();
+    await mount();
+    select('teacher-select', 1);
+    select(`return-end-${absence.id}-time`, '13:00:00');
+    submit(form('return', absence.id));
+    expect($(`return-end-${absence.id}-date`).required).toBe(true);
+    expect(posts()).toHaveLength(0);
+    expect($('notice').textContent).toContain('Complete the return time');
+  });
+
+  it('preserves incomplete date/time drafts rather than resetting them to midnight or return-now on refresh', async () => {
+    const absence = await create();
+    await mount();
+    select('teacher-select', 1);
+    select(`return-end-${absence.id}-time`, '13:15:00');
+    $(`claim-start-${absence.id}`).closest('.date-time').querySelector('[data-action="edit-time"]').click();
+    fill(`claim-start-${absence.id}-exact`, '09:07:37');
+    $('refresh-button').click();
+    await idle();
+    expect($(`return-end-${absence.id}-date`).value).toBe('');
+    expect($(`return-end-${absence.id}-time`).value).toBe('13:15:00');
+    expect($(`return-end-${absence.id}-date`).required).toBe(true);
+    expect($(`claim-start-${absence.id}-exact`).value).toBe('09:07:37');
+    expect($(`claim-start-${absence.id}-exact`).hidden).toBe(false);
+    submit(form('return', absence.id));
+    expect(posts()).toHaveLength(0);
   });
 });

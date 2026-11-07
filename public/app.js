@@ -4,7 +4,7 @@
   let actorUpdaters = [];
   const formatter = new Intl.DateTimeFormat(undefined, {
     year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit',
-    second: '2-digit', fractionalSecondDigits: 3, timeZoneName: 'longOffset', hour12: false
+    second: '2-digit', timeZoneName: 'longOffset', hour12: false
   });
   const instant = value => formatter.format(new Date(value));
   const range = (start, end) => `${instant(start)} → ${instant(end)}`;
@@ -60,7 +60,7 @@
     const date = new Date(value);
     const pad = (number, length = 2) => String(number).padStart(length, '0');
     return `${pad(date.getFullYear(), 4)}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
-      `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.${pad(date.getMilliseconds(), 3)}`;
+      `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
   }
 
   function prefill(input, iso) {
@@ -69,6 +69,7 @@
     // an ambiguous DST wall time. Compare against the browser-sanitized value.
     input.dataset.sourceValue = input.value;
     input.dataset.sourceIso = iso;
+    input.timeControl.syncFromValue();
   }
 
   function readTime(input) {
@@ -98,11 +99,121 @@
   }
 
   function dateField(form, id, name, label, required = true) {
+    const group = node('fieldset', undefined, 'date-time');
+    group.append(node('legend', label));
+    // This canonical local value keeps the existing ISO/validation path while
+    // visible controls expose only dates, quarter-hour slots, and whole seconds.
     const input = node('input');
-    Object.assign(input, { id, name, type: 'datetime-local', step: '0.001', required });
-    const caption = node('label', label);
-    caption.htmlFor = id;
-    form.append(caption, input);
+    Object.assign(input, { id, name, type: 'hidden' });
+    input.dataset.timeField = '';
+    const row = node('div', undefined, 'date-time-row');
+    const datePart = node('div');
+    const timePart = node('div');
+    const date = node('input');
+    Object.assign(date, { id: `${id}-date`, type: 'date', required });
+    const dateLabel = node('label', 'Date');
+    dateLabel.htmlFor = date.id;
+    datePart.append(dateLabel, date);
+    const slots = node('select');
+    slots.id = `${id}-time`;
+    for (let minute = 0; minute < 24 * 60; minute += 15) {
+      const text = `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
+      slots.add(new Option(text, `${text}:00`));
+    }
+    const exact = node('input');
+    Object.assign(exact, { id: `${id}-exact`, type: 'time', step: '1', hidden: true, disabled: true });
+    const timeLabel = node('label', 'Time (15-minute choices)');
+    timeLabel.htmlFor = slots.id;
+    const actions = node('div', undefined, 'time-actions');
+    const edit = node('button', 'Edit exact time');
+    edit.type = 'button';
+    edit.dataset.action = 'edit-time';
+    edit.setAttribute('aria-controls', exact.id);
+    edit.setAttribute('aria-expanded', 'false');
+    const clear = node('button', 'Clear');
+    clear.type = 'button';
+    clear.setAttribute('aria-label', `Clear ${label}`);
+    actions.append(edit, clear);
+    timePart.append(timeLabel, slots, exact);
+    row.append(datePart, timePart);
+    group.append(input, row, actions);
+    form.append(group);
+    let custom = false;
+    const fullTime = value => /^\d{2}:\d{2}$/.test(value) ? `${value}:00` : value;
+
+    function ensureSlot(value) {
+      for (const option of [...slots.options]) {
+        if (option.dataset.custom) option.remove();
+      }
+      if (value && ![...slots.options].some(option => option.value === value)) {
+        const option = new Option(`${value} (exact)`, value);
+        option.dataset.custom = 'true';
+        slots.add(option);
+      }
+      slots.value = value || '00:00:00';
+    }
+
+    function setMode(value) {
+      custom = value;
+      slots.hidden = custom;
+      slots.disabled = custom;
+      exact.hidden = !custom;
+      exact.disabled = !custom;
+      input.dataset.timeMode = custom ? 'exact' : 'slots';
+      timeLabel.textContent = custom ? 'Exact time (hours, minutes, seconds)' : 'Time (15-minute choices)';
+      timeLabel.htmlFor = custom ? exact.id : slots.id;
+      edit.textContent = custom ? 'Use 15-minute choices' : 'Edit exact time';
+      edit.setAttribute('aria-expanded', String(custom));
+    }
+
+    function sync(edited = false) {
+      const time = fullTime(custom ? exact.value : slots.value);
+      // Optional early-return fields mean "now" only when truly empty. A user
+      // selecting a nonzero/exact time must also explicitly choose its date.
+      date.required = required || custom || time !== '00:00:00';
+      exact.required = required || Boolean(date.value);
+      input.value = date.value && time ? `${date.value}T${time}` : '';
+      input.dataset.dateValue = date.value;
+      input.dataset.timeValue = time;
+      if (edited) {
+        delete input.dataset.sourceIso;
+        delete input.dataset.sourceValue;
+      }
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    function syncFromValue() {
+      const [day, time] = input.value ? input.value.split('T')
+        : [input.dataset.dateValue || '', input.dataset.timeValue ?? '00:00:00'];
+      date.value = day;
+      ensureSlot(fullTime(time));
+      exact.value = fullTime(time);
+      setMode(input.dataset.timeMode === 'exact');
+      sync();
+    }
+
+    function toggle() {
+      if (!custom) exact.value = slots.value || '00:00:00';
+      else ensureSlot(fullTime(exact.value));
+      setMode(!custom);
+      sync(); // Changing editor alone must not reinterpret a prefilled DST fold.
+      (custom ? exact : slots).focus();
+    }
+    edit.addEventListener('click', toggle);
+    slots.addEventListener('dblclick', event => { event.preventDefault(); if (!custom) toggle(); });
+    date.addEventListener('input', () => sync(true));
+    slots.addEventListener('change', () => sync(true));
+    exact.addEventListener('input', () => sync(true));
+    function reset() {
+      date.value = '';
+      exact.value = '00:00:00';
+      ensureSlot('00:00:00');
+      setMode(false);
+      sync(true);
+    }
+    clear.addEventListener('click', reset);
+    input.timeControl = { syncFromValue, reset };
+    reset();
     return input;
   }
 
@@ -110,7 +221,7 @@
     const drafts = new Map();
     for (const form of document.querySelectorAll('form[data-absence-id]')) {
       const values = {};
-      for (const input of form.querySelectorAll('input')) {
+      for (const input of form.querySelectorAll('input[data-time-field]')) {
         values[input.name] = { value: input.value, ...input.dataset };
       }
       drafts.set(`${form.dataset.kind}:${form.dataset.absenceId}`, values);
@@ -125,6 +236,10 @@
       input.dataset.sourceIso = saved.sourceIso;
       input.dataset.sourceValue = saved.sourceValue;
     }
+    input.dataset.timeMode = saved.timeMode || 'slots';
+    input.dataset.dateValue = saved.dateValue || '';
+    input.dataset.timeValue = saved.timeValue ?? '00:00:00';
+    input.timeControl.syncFromValue();
   }
 
   function renderUsers() {
@@ -204,9 +319,6 @@
           Date.parse(window.end_time) <= Date.parse(gap.end_time));
         select.value = index < 0 ? '' : String(index);
       } catch { select.value = ''; }
-    } else {
-      select.value = '0';
-      choose();
     }
     select.addEventListener('change', choose);
     start.addEventListener('input', update);
@@ -378,6 +490,8 @@
   }
 
   const absenceForm = $('absence-form');
+  const absenceStart = dateField($('absence-start-container'), 'absence-start', 'start_time', 'Start (local time)');
+  const absenceEnd = dateField($('absence-end-container'), 'absence-end', 'end_time', 'End (local time)');
   const updatePreview = () => {
     try {
       const window = readWindow($('absence-start'), $('absence-end'));
@@ -397,6 +511,8 @@
       };
       mutate('/api/absences', payload, response => {
         absenceForm.reset();
+        absenceStart.timeControl.reset();
+        absenceEnd.timeControl.reset();
         $('teacher-select').value = String(payload.teacher_id);
         $('absence-preview').textContent = 'Select start and end times to preview their UTC offsets.';
         return `${response.status === 201 ? 'Created' : 'Merged'} absence #${response.data.id}.`;

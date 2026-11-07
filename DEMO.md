@@ -11,9 +11,9 @@ Open `http://localhost:3000`. The server uses `school.db` by default; set `DB_PA
 
 ## Suggested walkthrough
 
-1. **Create:** select Alice as the teacher. Choose a future date, 09:00–16:00, and an optional multiword reason. Submit and confirm the board shows **Open**.
-2. **Split coverage:** select David as substitute. Keep the prefilled 09:00 start but change the end to 12:00. Claim it; the board becomes **Partially Covered**, with 12:00–16:00 uncovered.
-3. **Complete coverage:** select Sarah and claim the remaining 12:00–16:00 window. The board becomes **Claimed** with both assignments.
+1. **Create:** select Alice as the teacher. Dates start blank and times start at 00:00. Choose a future date and 09:00–16:00 using the 15-minute choices, plus an optional multiword reason. Submit and confirm the board shows **Open**.
+2. **Split coverage:** select David as substitute and explicitly choose the uncovered 09:00–16:00 window. This fills its known dates/times. Keep the start but select a 12:00 end. Claim it; the board becomes **Partially Covered**, with 12:00–16:00 uncovered.
+3. **Complete coverage:** select Sarah, choose the remaining 12:00–16:00 uncovered window, and claim it. The board becomes **Claimed** with both assignments.
 4. **Cancel:** with Sarah still selected, cancel her remaining coverage and confirm. That portion reopens. For an assignment already underway, elapsed coverage is retained.
 5. **Early return:** select Alice in the teacher selector. In her board card, choose an earlier end after the start (for example, 11:00 on the same future date), then confirm **Shorten absence**. Assignments crossing the cutoff are shortened; later assignments are removed. Blank cutoff means return now and only works after the absence has started.
 6. **Merge:** create a separate open absence, then another overlapping open window for that same teacher. They combine under the lowest existing ID and retain distinct reasons. Any existing coverage blocks merging; adjacent windows remain separate.
@@ -22,6 +22,8 @@ Open `http://localhost:3000`. The server uses `school.db` by default; set `DB_PA
 ## Time and recovery behavior
 
 - Inputs use your browser's local timezone. The timezone and resolved UTC offsets are displayed; the API stores normalized UTC milliseconds.
+- Times offer 15-minute choices starting at 00:00, not the current time. Double-click a time or use **Edit exact time** to type hours, minutes, and seconds. Milliseconds are not shown or entered. Returning to slot choices preserves an existing exact time rather than silently rounding it; **Clear** restores a blank date and midnight.
+- Claim dates/times remain unselected until you choose a coverage gap. An unchanged chosen gap retains its exact stored instant internally, including any API-origin millisecond precision, without exposing fractional-second controls.
 - Use separate absence windows around breaks. Lunch periods are not inferred.
 - Prefilled gap times preserve their exact instant, including the later occurrence of a repeated daylight-saving time. Manually typed repeated times use the browser's earlier occurrence, shown in the preview; nonexistent spring-forward times are rejected.
 - All claims submit explicit start/end values. Switching actors or refreshing does not silently expand an edited range.
@@ -36,7 +38,7 @@ npm test
 npm test -- --sequence.shuffle --sequence.seed=20261107
 ```
 
-108 tests cover API rules, normalization, multi-row rollback, gaps, independent-process SQLite concurrency/persistence, and DOM interactions against the real API. A separate isolated Chromium run also exercised desktop/mobile layout, complete workflows, conflicting browser pages, a committed write with a lost response, and New York daylight-saving cases. Chromium/Playwright is not a project dependency; the committed DOM tests run with JSDOM through `npm test`.
+118 tests cover API rules, normalization, multi-row rollback, gaps, independent-process SQLite concurrency/persistence, and DOM interactions against the real API, including the revised time controls. A separate isolated Chromium run exercised desktop/mobile, real double-click/second editing, midnight defaults, full workflows, conflicting pages, lost responses, and New York daylight-saving cases. Chromium/Playwright is not a project dependency; committed DOM tests run with JSDOM through `npm test`.
 
 ## Known limits
 
