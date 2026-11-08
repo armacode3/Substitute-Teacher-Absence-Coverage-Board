@@ -16,7 +16,7 @@ Open `http://localhost:3000`. The server uses `school.db` by default; set `DB_PA
 3. **Complete coverage:** select Sarah, choose the remaining **12:00 PM–4:00 PM** window, and claim it. The board becomes **Claimed** with both assignments.
 4. **Cancel:** with Sarah still selected, cancel her remaining coverage and confirm. That portion reopens. For an assignment already underway, elapsed coverage is retained.
 5. **Early return:** select Alice. In her card, choose an earlier end after the start (for example, **11:00 AM** on the same future date), then confirm **Shorten absence**. Crossing assignments shorten; later ones are removed. Blank cutoff means return now and only works after the absence starts.
-6. **Merge:** create a separate open absence, then another overlapping open window for that same teacher. They combine under the lowest existing ID and retain distinct reasons. Any existing coverage blocks merging; adjacent windows remain separate.
+6. **Merge existing records:** on a separate future date with no coverage, create two open windows for Alice: **9:00–10:00 AM** and **11:00 AM–12:00 PM**. Then submit **9:30–11:30 AM**, which overlaps both. One record remains under the lowest existing ID; the success message names the higher ID that was removed. Distinct reasons are retained. Any coverage on an affected record blocks merging.
 7. **Conflict:** open the portal in a second tab. Have both tabs attempt the same uncovered time. The second conflicting claim is rejected and its board refreshes; no duplicate coverage is created.
 
 ## Time and recovery behavior
@@ -29,7 +29,18 @@ Open `http://localhost:3000`. The server uses `school.db` by default; set `DB_PA
 - All claims submit explicit start/end values. Switching actors or refreshing does not silently expand an edited range.
 - Controls are disabled while saving. After an uncertain network outcome, the UI reloads current state without automatically repeating the write. If reloading fails, mutations remain disabled until **Refresh directory & board** succeeds.
 - The last-update time is visible. This is a refresh-based board, not a permanently live view.
+- The board is chronological (earliest absence start first), not sorted by ID. A higher ID can appear before a lower one without indicating a failed merge.
 - The directory displays certification metadata if records exist. No credentials are invented for seeded users, and certification does not enforce eligibility.
+
+## Understanding create/merge feedback
+
+- **Created:** a new record was added. Adjacent windows stay separate: an absence ending at midnight and another beginning at that same midnight do not overlap.
+- **Updated existing absence:** the submission extended or added reasons to one existing open record. There was no second existing record to delete.
+- **Already covers this request:** an identical/contained request added no time or reasons; nothing was changed or removed.
+- **Merged overlapping open absences:** multiple existing records consolidated. The message names the surviving lowest ID and the removed IDs.
+- **Coverage conflict:** any assignment, even partial coverage, prevents merging its absence. Overlapping only an uncovered portion of that same absence still does not bypass this protection.
+
+For example, Nov 14 at 10:00 AM → Nov 16 at 12:00 AM is adjacent to Nov 16 at 12:00 AM → Nov 18 at 11:00 AM. Those remain two records. To test deletion, use genuinely overlapping, completely unassigned records as in step 6.
 
 ## Verification
 
@@ -38,7 +49,7 @@ npm test
 npm test -- --sequence.shuffle --sequence.seed=20261107
 ```
 
-131 tests cover API rules, normalization, rollback, gaps, independent-process concurrency/persistence, and DOM/API interactions including AM/PM, midnight/noon, and draft preservation. Isolated Chromium checks cover desktop/mobile, real double-click/second editing, explicit PM conversion, full workflows, conflicting pages, lost responses, and New York DST. Chromium/Playwright is not a project dependency; committed DOM tests use JSDOM through `npm test`.
+136 tests cover API rules, normalization, rollback, gaps, concurrency/persistence, DOM/API interactions, AM/PM, and accurate create/merge outcomes. Isolated Chromium checks also reproduce the exact November adjacency/retry case and real consolidation with surviving/removed IDs. They cover desktop/mobile, lifecycle/conflicts, lost responses, and New York DST. Playwright is not a project dependency; committed DOM tests use JSDOM through `npm test`.
 
 ## Known limits
 

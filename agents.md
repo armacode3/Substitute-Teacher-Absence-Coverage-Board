@@ -28,7 +28,7 @@ README also requires milestone Git commits and final packaging including `.git`,
 - `src/coverage.js`: immediate write transactions, coherent batched read transactions, merge closure, linear gaps, lifecycle changes, response serialization.
 - `src/validation.js`, `src/errors.js`: strict IDs/bodies/calendar timestamps, millisecond truncation, and business errors.
 - `public/index.html`, `public/app.js`: functional build-free vanilla UI: directory/credentials, teacher form, assignments/gaps, explicit-range claims, lifecycle actions, timezone previews, preserved drafts, and pending/refresh recovery.
-- Tests: API (72), gap (3), concurrency (9), frontend DOM/API (47): 131 total. Worker helper exercises independent processes/file-backed connections. JSDOM is test-only; no dependencies added for AM/PM.
+- Tests: API (74), gap (3), concurrency (9), frontend DOM/API (50): 136 total. Worker helper exercises independent processes/file-backed connections. JSDOM is test-only; no dependencies added for the merge-feedback fix.
 - `package.json`: `npm start`, `npm run dev`, `npm test`; no frontend build.
 
 ## Completed work
@@ -48,10 +48,11 @@ README also requires milestone Git commits and final packaging including `.git`,
 - Architecture committed as `512f9ab`; backend committed as `2e19f21`. Frontend and 24 new DOM/API tests are complete. Final contract is in `ARCHITECTURE.md`; guided user review in `DEMO.md`.
 - Original frontend milestone: `fa00773`. User-requested refinement now removes visible/input milliseconds, uses 15-minute slots starting at midnight with blank dates, and enables whole-second editing by double-click or accessible button. Claims explicitly choose a gap before any bounds fill. Partial/complete drafts and original unchanged API/DST instants are preserved. Backend contract is unchanged; docs and walkthrough reflect the new controls.
 - Quarter-hour controls committed as `d21495c`. Latest user refinement adds AM/PM throughout visible times; exact editing uses 12-hour hh:mm:ss plus an explicit period selector. Midnight is 12:00 AM; noon 12:00 PM. Canonical/API times are unchanged. Invalid or incomplete exact text/PM drafts are preserved rather than coerced to midnight. Docs/walkthrough are updated.
+- AM/PM committed as `0770435`. Investigated the user's November merge report: actual #3/#4 are adjacent, #3 is covered, and chronological order explains #4 first. Reproduced misleading "Merged" on an unchanged duplicate submission in memory; historical browser sequence is not provable. Added explicit operation/removed-ID create metadata, accurate outcome messages, and a sorting explanation. User data was only read, never written; scheduling rules were not relaxed.
 
 ## Validation
 
-- Latest normal and shuffled full runs both pass **131 tests** (47 frontend). Chromium passes AM/PM midnight/noon labels, exact 1:30:05 PM conversion, real double-click editing, mobile/desktop, workflows/conflicts/response loss/DST, with no page errors. Whitespace check passed.
+- Latest normal and shuffled full runs both pass **136 tests** (50 frontend). Exact-November Chromium regression passes creation/no-op feedback, chronological #4/#3 order, protected coverage/rejection, and real consolidation IDs. Full existing Chromium smoke and CRLF-aware whitespace checks also pass. The user's saved database was never written by diagnostic/test actions.
 - All three Mermaid diagrams passed syntax validation (tools only in `/tmp/opencode/aps-mermaid-11XweJ`). Chromium smoke passed desktop/mobile workflows, lifecycle actions, two-page conflicts, committed-response loss, and New York DST, with no uncaught page errors. Isolated browser tools/script/screenshots are in `/tmp/opencode/aps-browser-UGqW6a`; they are not project dependencies. Inspect `AI_LOG.md` for the command and evidence.
 - Use `git -c core.whitespace=cr-at-eol diff --check`: npm preserved the original lockfile's CRLF endings, which otherwise appear as trailing whitespace. No broad lockfile reformat was done.
 - Audit: zero production findings (`npm audit --omit=dev`), six existing Vitest/Vite dev-tool findings including critical. No force upgrades. Do not expose development/test servers or run untrusted tests; a toolchain upgrade needs separate review.
@@ -92,7 +93,9 @@ README also requires milestone Git commits and final packaging including `.git`,
 
 ## Current milestone and next steps
 
-- Current change set: `feat: add explicit AM/PM time selection`; check Git log/status for its resulting commit. Implementation, normal/shuffled tests, browser, and whitespace checks pass. No backend/dependency changes or cleanup.
+- Current change set: `fix: report absence merge outcomes accurately`; check Git log/status for the resulting commit. All normal/shuffled tests, both browser scripts, and whitespace validation pass. User's `school.db` is real demo work: do not alter/reset/delete it. Reload the page to load new JS; restart the API if using a non-watching server. Legacy response shapes get neutral Saved wording rather than inferred merges.
+
+- Previous AM/PM milestone: `0770435` (`feat: add explicit AM/PM time selection`). No dependency upgrades or submission cleanup are authorized.
 
 - Previous picker milestone: `d21495c` (`feat: simplify date and time selection`). Blank optional early-return controls still mean server now; an edited time requires a date, so incomplete input cannot accidentally trigger it.
 

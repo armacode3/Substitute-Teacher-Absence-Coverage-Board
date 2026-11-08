@@ -565,7 +565,16 @@
         absenceEnd.timeControl.reset();
         $('teacher-select').value = String(payload.teacher_id);
         $('absence-preview').textContent = 'Select start and end times to preview their UTC offsets.';
-        return `${response.status === 201 ? 'Created' : 'Merged'} absence #${response.data.id}.`;
+        const { id, operation, removed_absence_ids: removed = [] } = response.data;
+        if (operation === 'created') return `Created absence #${id}. Adjacent absences remain separate.`;
+        if (operation === 'merged') {
+          return `Merged overlapping open absences into #${id}; removed records ${removed.map(value => `#${value}`).join(', ')}.`;
+        }
+        if (operation === 'unchanged') return `Absence #${id} already covers this request. No records were changed or removed.`;
+        if (operation === 'updated') return `Updated existing absence #${id} with overlapping time or reasons. No other absence records were removed.`;
+        // A page can remain open while the server is upgraded. Do not infer a
+        // destructive merge solely from HTTP 200 on an older response shape.
+        return `Saved absence #${id}. Refresh the board to review its current window.`;
       });
     } catch (error) { notice(error.message, 'error'); }
   });

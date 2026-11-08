@@ -167,13 +167,15 @@ describe('Sub Coverage API', () => {
 
   it('merges multiple windows, preserves the lowest ID rather than earliest time, and deduplicates reasons', async () => {
     const first = await create(1, 11, 12, 'Personal leave');
-    await create(1, 9, 10, 'Medical appointment');
+    const removed = await create(1, 9, 10, 'Medical appointment');
     const merged = await request(app).post('/api/absences').send({
       teacher_id: 1, start_time: at(9, 30), end_time: at(11, 30), reason: ' Personal leave '
     });
     expect(merged.status).toBe(200);
     expect(merged.body).toMatchObject({ id: first.id, start_time: at(9), end_time: at(12) });
     expect(merged.body.reasons).toEqual(['Personal leave', 'Medical appointment']);
+    expect(merged.body.operation).toBe('merged');
+    expect(merged.body.removed_absence_ids).toEqual([removed.id]);
     expect((await board())).toHaveLength(1);
   });
 
@@ -182,6 +184,43 @@ describe('Sub Coverage API', () => {
     const earlier = await create(1, 9, 10);
     const other = await create(2, 9, 11);
     expect((await board()).map(row => row.id)).toEqual([earlier.id, other.id, later.id]);
+  });
+
+  it('keeps the reported November midnight boundary separate from covered #3 and reports repeated #4 as unchanged', async () => {
+    clock = Date.parse('2026-11-08T12:00:00Z');
+    app.locals.db.prepare('INSERT INTO absences (id, teacher_id, start_time, end_time, reasons) VALUES (?, ?, ?, ?, ?)')
+      .run(3, 1, Date.parse('2026-11-16T00:00:00-05:00'), Date.parse('2026-11-18T11:00:00-05:00'), '["Existing"]');
+    expect((await request(app).post('/api/absences/3/claim').send({
+      substitute_id: 4, start_time: '2026-11-16T12:00:00-05:00', end_time: '2026-11-18T11:00:00-05:00'
+    })).status).toBe(200);
+    const input = { teacher_id: 1, start_time: '2026-11-14T10:00:00-05:00', end_time: '2026-11-16T00:00:00-05:00', reason: 'New' };
+    const created = await request(app).post('/api/absences').send(input);
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ id: 4, operation: 'created', removed_absence_ids: [] });
+    const before = { absences: rows('absences'), assignments: rows('assignments') };
+    const repeated = await request(app).post('/api/absences').send(input);
+    expect(repeated.status).toBe(200);
+    expect(repeated.body).toMatchObject({ id: 4, operation: 'unchanged', removed_absence_ids: [] });
+    expect((await board()).map(row => row.id)).toEqual([4, 3]);
+    const overlapping = await request(app).post('/api/absences').send({ ...input, end_time: '2026-11-16T00:15:00-05:00' });
+    expect(overlapping.status).toBe(409);
+    expect(overlapping.body.error.code).toBe('COVERAGE_PROTECTED');
+    expect(rows('absences')).toEqual(before.absences);
+    expect(rows('assignments')).toEqual(before.assignments);
+  });
+
+  it('distinguishes updating one existing window from deleting/merging records and skips no-op writes', async () => {
+    const absence = await create(1, 9, 12, 'First');
+    const updated = await postAbsence(1, 11, 15, 'Second');
+    expect(updated.status).toBe(200);
+    expect(updated.body).toMatchObject({ id: absence.id, operation: 'updated', removed_absence_ids: [] });
+    expect(updated.body.reasons).toEqual(['First', 'Second']);
+    const before = rows('absences');
+    app.locals.db.exec("CREATE TRIGGER forbid_noop_update BEFORE UPDATE ON absences BEGIN SELECT RAISE(ABORT, 'no-op should not write'); END");
+    const duplicate = await postAbsence(1, 11, 15, 'Second');
+    expect(duplicate.status).toBe(200);
+    expect(duplicate.body.operation).toBe('unchanged');
+    expect(rows('absences')).toEqual(before);
   });
 
   it('does not partly merge when another affected absence has partial coverage', async () => {

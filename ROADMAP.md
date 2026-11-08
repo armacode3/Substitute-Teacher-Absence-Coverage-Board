@@ -21,13 +21,13 @@ The README suggests a roughly 60-minute exercise. Favor correctness and a small 
 | `src/coverage.js` | Transactional scheduling service, snapshot reads, merge closure, linear gap calculation, lifecycle operations, and derived response data. |
 | `src/validation.js`, `src/errors.js` | Strict ISO/ID/body validation, millisecond normalization, and business errors. |
 | `public/index.html`, `public/app.js` | Build-free HTML/vanilla JS; directory/credentials, creation, coverage/gaps, explicit claims, lifecycle controls, timezone previews, pending state, and refresh recovery. |
-| `tests/api.test.js`, `tests/coverage.test.js`, `tests/concurrency.test.js`, `tests/frontend.test.js` | 131 tests covering API, gaps, rollback, persistence, concurrency, DOM interactions, and AM/PM time controls. Temporary data/connections are cleaned up. |
+| `tests/api.test.js`, `tests/coverage.test.js`, `tests/concurrency.test.js`, `tests/frontend.test.js` | 136 tests covering API, rollback, persistence/concurrency, DOM interactions, AM/PM, and accurate adjacent/update/no-op/merge feedback. Temporary data/connections are cleaned up. |
 | `ARCHITECTURE.md` | Reviewed ERD, create/merge and claim flows, three genuine design corrections, finalized contracts, and implementation checkpoint. |
 | `AI_LOG.md` | Real planning prompts, review corrections, implementation findings, and test evidence. |
 
 Request flow: browser → Express routes → synchronous `better-sqlite3` queries → SQLite → JSON response → browser rendering. No frontend build, authentication, ORM, or external service is present or needed for the stated task.
 
-Original baseline: one seeded-user test. Current verification: 131 tests pass. JSDOM is test-only; no runtime frameworks were added. Chromium checks cover workflows, AM/PM controls, and desktop/mobile. Git milestones: architecture `512f9ab`, backend `2e19f21`, initial UI `fa00773`, quarter-hour controls `d21495c`; AM/PM is the latest user-requested refinement.
+Original baseline: one seeded-user test. Current verification: 136 tests pass. JSDOM is test-only; no runtime frameworks were added. Chromium also verifies the reported November boundary and exact record-consolidation feedback. Git milestones include architecture `512f9ab`, backend `2e19f21`, initial UI `fa00773`, quarter-hour controls `d21495c`, and AM/PM `0770435`. The current bug fix clarifies outcomes without changing scheduling rules or user data.
 
 ## Design choices to discuss
 

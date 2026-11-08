@@ -2,7 +2,7 @@
 
 ## Status
 
-This began as a prospective design review. The feature has 131 tests including rollback, concurrency, DOM/API behavior, and AM/PM controls. Chromium verifies workflows, explicit PM conversion, stale conflicts, lost responses, mobile layout, and DST. This is not a claim of full production coverage. Contracts are in `ARCHITECTURE.md`; walkthrough in `DEMO.md`.
+This began as a prospective design review. The feature has 136 tests including rollback, concurrency, DOM/API behavior, AM/PM, and accurate merge outcomes. Chromium also verifies the reported November #3/#4 adjacency/retry/protection case and real consolidation IDs. This is not full production coverage. Contracts are in `ARCHITECTURE.md`; walkthrough in `DEMO.md`.
 
 ## High-priority correctness scenarios
 
@@ -52,6 +52,8 @@ Example: absence 09:00–17:00, assignments 09:00–10:00, 11:00–12:00, 14:00�
 Existing open windows 09:00–10:00 and 11:00–12:00 plus a new 09:30–11:30 window should yield one 09:00–12:00 absence, preserving the lowest existing ID and all distinct reasons.
 
 If either affected window has any assignment, reject everything. Do not partially merge unassigned records before discovering protected coverage. Only genuinely overlapping connected windows combine; do not bridge an uncovered gap without an overlapping submitted window. Different teachers' windows never combine.
+
+User-reported feedback defect: an HTTP `200` create response used to always say "Merged," even when an identical request changed nothing. Explicit create-operation/removed-ID metadata now differentiates no-op, update of one record, and true consolidation. The exact midnight-adjacent case correctly keeps both records; chronological ordering is independent of lowest-ID survival during a real merge. Saved user data was inspected read-only, never modified during diagnosis.
 
 ### Finding affected records efficiently
 

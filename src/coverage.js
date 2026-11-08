@@ -134,14 +134,19 @@ function createCoverageService(db, { now = Date.now } = {}) {
       reject(400, 'REASONS_TOO_LARGE', 'Combined reasons exceed 32 KiB; no records were changed.');
     }
     let id;
+    let operation = 'created';
+    const removedAbsenceIds = affected.slice(1).map(row => row.id);
     if (affected.length) {
       id = affected[0].id;
-      updateAbsence.run(start, end, encoded, id);
+      const survivor = affected[0];
+      const changed = start !== survivor.start_time || end !== survivor.end_time || encoded !== survivor.reasons;
+      operation = affected.length > 1 ? 'merged' : changed ? 'updated' : 'unchanged';
+      if (operation !== 'unchanged') updateAbsence.run(start, end, encoded, id);
       for (const row of affected.slice(1)) deleteAbsence.run(row.id);
     } else {
       id = Number(insertAbsence.run(teacherId, start, end, encoded).lastInsertRowid);
     }
-    return { created: affected.length === 0, absence: result(id, time) };
+    return { created: affected.length === 0, operation, removedAbsenceIds, absence: result(id, time) };
   });
 
   const claim = db.transaction(({ absenceId, substituteId, start, end }) => {

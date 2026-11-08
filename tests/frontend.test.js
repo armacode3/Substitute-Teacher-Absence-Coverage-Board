@@ -141,7 +141,7 @@ describe('frontend DOM integration with the real API', () => {
     expect(doc.querySelector('.reason').textContent).toContain('Personal leave');
   });
 
-  it('shows a merged result and distinct reasons when logging overlapping open windows', async () => {
+  it('reports an update, not deleted records, when extending one existing open absence', async () => {
     const absence = await create(1, at(9), at(12), 'First reason');
     await mount();
     select('teacher-select', 1);
@@ -150,9 +150,68 @@ describe('frontend DOM integration with the real API', () => {
     fill('absence-reason', 'Second reason');
     submit($('absence-form'));
     await idle();
-    expect($('notice').textContent).toContain(`Merged absence #${absence.id}`);
+    expect($('notice').textContent).toContain(`Updated existing absence #${absence.id}`);
+    expect($('notice').textContent).toContain('No other absence records were removed');
     expect(doc.querySelectorAll('article.absence')).toHaveLength(1);
     expect((await board())[0].reasons).toEqual(['First reason', 'Second reason']);
+  });
+
+  it('reports the November adjacent creation/repeat accurately and explains chronological #4/#3 order', async () => {
+    process.env.TZ = 'America/New_York';
+    clock = Date.parse('2026-11-08T12:00:00Z');
+    app.locals.db.prepare('INSERT INTO absences (id, teacher_id, start_time, end_time, reasons) VALUES (?, ?, ?, ?, ?)')
+      .run(3, 1, Date.parse('2026-11-16T00:00:00-05:00'), Date.parse('2026-11-18T11:00:00-05:00'), '["Existing"]');
+    await request(app).post('/api/absences/3/claim').send({
+      substitute_id: 4, start_time: '2026-11-16T12:00:00-05:00', end_time: '2026-11-18T11:00:00-05:00'
+    });
+    await mount();
+    select('teacher-select', 1);
+    for (let submission = 0; submission < 2; submission++) {
+      fill('absence-start', '2026-11-14T10:00');
+      fill('absence-end', '2026-11-16T00:00');
+      fill('absence-reason', 'New');
+      submit($('absence-form'));
+      await idle();
+      expect($('notice').textContent).toContain(submission === 0 ? 'Created absence #4' : 'No records were changed or removed');
+      expect($('notice').textContent).not.toContain('Merged');
+    }
+    expect([...doc.querySelectorAll('article.absence')].map(article => article.dataset.absenceId)).toEqual(['4', '3']);
+    expect(doc.body.textContent).toContain('Sorted by absence start time (earliest first), not record ID');
+    const current = await board();
+    expect(current).toHaveLength(2);
+    expect(current.find(row => row.id === 3).assignments[0].start_time).toBe('2026-11-16T17:00:00.000Z');
+  });
+
+  it('identifies the removed record only when two existing open absences actually consolidate', async () => {
+    const survivor = await create(1, at(11), at(12), 'Later window, lower ID');
+    const removed = await create(1, at(9), at(10), 'Earlier window, higher ID');
+    await mount();
+    select('teacher-select', 1);
+    fill('absence-start', '2030-01-15T09:30');
+    fill('absence-end', '2030-01-15T11:30');
+    submit($('absence-form'));
+    await idle();
+    expect($('notice').textContent).toContain(`Merged overlapping open absences into #${survivor.id}; removed records #${removed.id}`);
+    expect(doc.querySelectorAll('article.absence')).toHaveLength(1);
+    expect((await board())[0].id).toBe(survivor.id);
+  });
+
+  it('does not infer a destructive merge from a legacy 200 response without operation metadata', async () => {
+    const absence = await create(1, at(9), at(12));
+    await mount();
+    fetchHook = async (path, options) => {
+      const response = await bridge(path, options);
+      if (options.method !== 'POST') return response;
+      const { operation, removed_absence_ids, ...legacy } = await response.json();
+      return { ...response, json: async () => legacy };
+    };
+    select('teacher-select', 1);
+    fill('absence-start', '2030-01-15T11:00');
+    fill('absence-end', '2030-01-15T15:00');
+    submit($('absence-form'));
+    await idle();
+    expect($('notice').textContent).toContain(`Saved absence #${absence.id}`);
+    expect($('notice').textContent).not.toContain('Merged');
   });
 
   it('claims split coverage, renders partial/full states, and reopens a cancelled portion', async () => {

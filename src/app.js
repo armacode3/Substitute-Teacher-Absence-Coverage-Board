@@ -36,7 +36,11 @@ function createApp(dbPath, options = {}) {
       ...windowTimes(body),
       reasons: reason(body.reason)
     });
-    res.status(result.created ? 201 : 200).json(result.absence);
+    res.status(result.created ? 201 : 200).json({
+      ...result.absence,
+      operation: result.operation,
+      removed_absence_ids: result.removedAbsenceIds
+    });
   });
 
   app.post('/api/absences/:id/claim', (req, res) => {
