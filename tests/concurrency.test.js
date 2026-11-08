@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
 import { fork } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createApp } from '../src/app.js';
@@ -87,7 +88,7 @@ describe('file-backed, separate-process scheduling concurrency', () => {
   let workers;
 
   beforeEach(() => {
-    directory = mkdtempSync('/tmp/opencode/aps-api-test-');
+    directory = mkdtempSync(join(tmpdir(), 'aps-api-test-'));
     dbPath = join(directory, 'school.db');
     app = createApp(dbPath, { now: () => Date.parse(at(8)) });
     workers = [];

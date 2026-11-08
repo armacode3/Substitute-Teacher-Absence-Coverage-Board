@@ -93,15 +93,19 @@ README also requires milestone Git commits and final packaging including `.git`,
 
 ## Current milestone and next steps
 
-- Current change set: `fix: report absence merge outcomes accurately`; check Git log/status for the resulting commit. All normal/shuffled tests, both browser scripts, and whitespace validation pass. User's `school.db` is real demo work: do not alter/reset/delete it. Reload the page to load new JS; restart the API if using a non-watching server. Legacy response shapes get neutral Saved wording rather than inferred merges.
+- Final submission review: user confirmed a third overlapping absence consolidated all three under the lowest ID. Fixed reviewer portability: concurrency tests now use Node's OS temporary directory (`TMPDIR` selects `/tmp/opencode` locally), not a required OpenCode-only path. Corrected stale architecture status, precision wording, create-response table, and teacher-role transaction boundary. Original README unchanged; final requirement checklist is in `DEMO.md`.
+- Fresh normal/shuffled runs: 136 tests pass. All three updated Mermaid diagrams, both Chromium scripts, and CRLF-aware whitespace validation pass. Clean-install verification at `/tmp/opencode/aps-submission-check-4kyNkE` passed `npm ci --no-audit --no-fund` and all 136 tests using a separate `TMPDIR`; original dependencies and demo database untouched.
+- README line 66 still requires a readable chat/CLI export or link. Tried supported `opencode session export <session> --sanitize` to `/tmp/opencode/aps-session-review.json`; prompt text is redacted, so this does not satisfy useful collaboration evidence. Do not claim the requirement complete. No readable export has been published/committed; it needs privacy review and attachment.
+
+- Merge-feedback milestone: `5af35f6` (`fix: report absence merge outcomes accurately`). User's `school.db` is real demo work: do not alter/reset/delete it. Legacy response shapes get neutral Saved wording rather than inferred merges.
 
 - Previous AM/PM milestone: `0770435` (`feat: add explicit AM/PM time selection`). No dependency upgrades or submission cleanup are authorized.
 
 - Previous picker milestone: `d21495c` (`feat: simplify date and time selection`). Blank optional early-return controls still mean server now; an edited time requires a date, so incomplete input cannot accidentally trigger it.
 
 1. Architecture committed before application code as `512f9ab` (`docs: finalize reviewed scheduling architecture`). Baseline is `99650d2`.
-2. Backend and frontend are complete. This verified change set is the UI milestone (`feat: connect coverage portal frontend`); check Git log/status for its resulting commit. All final test/browser/diagram checks pass. Documents are current and `DEMO.md` provides a user walkthrough.
-3. Ask the user to review the running demo and final deliverables. No additional scope or force dependency upgrades without approval. Browser timezone is explicit; manual repeated times choose the earlier occurrence, while unchanged prefilled gap instants retain their exact offset.
+2. Backend and frontend are complete; UI milestone is `fa00773`. Final review found no core architecture blocker. All checks pass, including clean install. Current review milestone: `fix: make submission tests portable and align architecture docs`; check Git log/status for the resulting commit.
+3. User has verified genuine three-record merging. Remaining submission deliverable: attach a readable transcript/export/link after privacy review. No additional scope or force dependency upgrades without approval. Browser timezone is explicit; manual repeated times choose the earlier occurrence, while unchanged prefilled gap instants retain their exact offset.
 4. Submission cleanup/packaging still requires user confirmation. Do not delete dependencies/data or zip the project yet; preserve hidden `.git` and milestone history when approved.
 
 ## Important correctness reminders

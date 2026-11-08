@@ -1,6 +1,6 @@
 # System Architecture & Schema Design
 
-> **Status: reviewed architecture; proceeding to database/API implementation.** This document is the implementation contract agreed through collaborative review. It includes explicitly requested extensions beyond the original whole-shift exercise.
+> **Status: implemented and verified.** This document records the implementation contract agreed through collaborative review. It includes explicitly requested extensions beyond the original whole-shift exercise; see the final verification checkpoint below.
 
 Approved: split assignments, UTC millisecond storage, distinct merge reasons, lowest-ID merge survival, required claim times, expiry rejection, substitute cancellation, teacher early return, informational certification metadata, coherent read snapshots, and all-or-nothing transactions. No authentication, full audit trail, credential eligibility engine, or automatic break inference is included.
 
@@ -57,7 +57,7 @@ For example, a 09:00–15:00 absence can have substitute A covering 09:00–12:0
 
 ### Constraints and time policy
 
-| Concern | Proposed enforcement |
+| Concern | Implemented enforcement |
 | --- | --- |
 | Valid user role values | Existing `users.role` check constraint |
 | Referenced users exist | Foreign keys with SQLite foreign keys enabled |
@@ -77,7 +77,7 @@ The API returns canonical ISO timestamp strings. Separate local date/time contro
 
 **Approved contract:** ISO input/output with `Z` or a numeric UTC offset; integer UTC Unix milliseconds in SQLite. Milliseconds match JavaScript's `Date` representation, avoiding unit conversions with no material impact at this scale. Seconds and Julian-day storage were considered; milliseconds were selected for implementation convenience, not because school scheduling requires sub-second precision.
 
-**Revised precision policy:** accept otherwise valid ISO timestamps with more than three fractional-second digits and truncate the fractional part to milliseconds before storage, comparison, and response serialization. For example, `2026-11-07T09:00:00.123456Z` becomes `2026-11-07T09:00:00.123Z`. Validate the complete input's syntax, calendar values, and timezone before discarding any digits; truncation must not rescue malformed input. No fractional part, one digit, or two digits can be represented exactly at millisecond precision.
+**Revised precision policy:** accept otherwise valid ISO timestamps with more than three fractional-second digits and truncate the fractional part to milliseconds before storage, comparison, and response serialization. For example, `2026-11-07T09:00:00.123456Z` becomes `2026-11-07T09:00:00.123Z`. Validate the complete input's syntax, calendar values, and timezone before discarding any digits; truncation must not rescue malformed input. Inputs with no fractional part or with one or two fractional digits are represented exactly by padding to milliseconds.
 
 The parser accepts calendar timestamps with seconds, four-digit or signed six-digit years, and an explicit colon-separated UTC offset or `Z`. Leap seconds, timezone-less/date-only inputs, and values outside JavaScript's representable date range are rejected. SQL timestamp checks enforce integer values within that same date range. Truncating fractional digits before offset conversion also works correctly for pre-epoch dates.
 
@@ -92,7 +92,7 @@ AND existing.end_time > requested.start_time
 
 Indexes: `absences(teacher_id, start_time)`, `assignments(absence_id, start_time)`, and `assignments(substitute_id, start_time)`. Certifications have a unique `(substitute_id, name)` pair. These support the main lookup/conflict paths without asserting that a simple unique index can prevent interval overlaps. Credentials are informational, returned with users; no credentials will be fabricated for the starter users and credential management/verification is deferred.
 
-Database triggers are an alternative if role, assignment containment, and overlap rules must also protect direct SQL writes. The proposed implementation uses API validation and immediate transactions for these cross-row rules, alongside database foreign keys and row checks; it does not claim protection against arbitrary direct SQL writes violating cross-row invariants.
+Database triggers are an alternative if role, assignment containment, and overlap rules must also protect direct SQL writes. The implementation uses API validation and immediate transactions for these cross-row rules, alongside database foreign keys and row checks; it does not claim protection against arbitrary direct SQL writes violating cross-row invariants.
 
 The user agrees with layered enforcement boundaries. Parameterized SQL and safe rendering of free text are also required implementation practices. These measures protect data integrity and reduce injection risks, but do not provide authentication or ownership authorization: submitted user IDs are still simulated actors in this take-home.
 
@@ -120,7 +120,7 @@ Basic history can be read from retained records; counts should be computed rathe
 | Endpoint | Request | Success |
 | --- | --- | --- |
 | `GET /api/users?role=teacher` or `substitute` | Existing user lookup | `200`, user array |
-| `POST /api/absences` | `{ teacher_id, start_time, end_time, reason? }` | `201` for a new absence, `200` for a merge; resulting absence in either case |
+| `POST /api/absences` | `{ teacher_id, start_time, end_time, reason? }` | `201` for a new absence, `200` for update/no-op/merge; resulting absence plus operation metadata |
 | `GET /api/absences` | No body | `200`, array with teacher name, reasons, assignment/substitute details, uncovered windows, and derived status |
 | `POST /api/absences/:id/claim` | `{ substitute_id, start_time, end_time }`; both times required | `200`, updated absence including its assignments |
 | `POST /api/assignments/:id/cancel` | `{ substitute_id }` | `200`, updated absence with reopened future coverage |
@@ -148,16 +148,18 @@ Pending controls prevent duplicate clicks; after ambiguous network failures, ref
 
 ```mermaid
 flowchart TD
-    A[POST absence] --> B{Valid teacher, times, and reason?}
+    A[POST absence] --> B{Valid request shape, teacher ID, times, and reason?}
     B -->|No| C[400 validation error]
     B -->|Yes| D[Begin immediate transaction]
-    D --> E[Find same-teacher overlaps and expand candidate window until stable]
+    D --> T{Existing user has teacher role?}
+    T -->|No| V[Rollback and return 400 invalid teacher]
+    T -->|Yes| E[Find same-teacher overlaps and expand candidate window until stable]
     E --> F{Any affected absence has assignments?}
     F -->|Yes| G[Rollback without changing any records]
     G --> H[409 conflict: preserve existing coverage]
     F -->|No| I{Any open overlaps?}
     I -->|No| J[Insert new open absence]
-    I -->|Yes| K[Combine open absences into one window]
+    I -->|Yes| K[Keep lowest ID, combine time and reasons, remove other affected records, skip no-op writes]
     J --> L[Commit and return resulting absence]
     K --> L
 ```
@@ -232,7 +234,7 @@ These are explicit lifecycle operations, not exceptions that allow ordinary merg
 - **Substitute cancellation:** validate the selected actor owns the assignment. For an entirely future assignment, delete it and reopen that window. For an in-progress assignment, retain its elapsed portion and release only the remainder, using a single server-clock cutoff. Do not reopen historical time as if it had never been covered. Reject cancellation of already-ended assignments with `409`.
 - **Teacher early return:** validate the teacher owns the absence and shorten its end. Leave assignments ending before the cutoff alone, truncate those crossing the cutoff, and remove those starting at/after it. Update the absence and all assignments in the same transaction. Never extend a shift through this operation. Omitted end means server now; an explicit cutoff cannot backdate before now. Reject a cutoff at/before the absence start (`400`), an extension (`400`), or changing an already-ended absence (`409`). An explicit retry matching the current end is a no-op success after actor validation. Whole-absence cancellation before it starts is deferred.
 - All lifecycle operations, merges, and claims use the same immediate write-transaction boundary. A failure rolls back every change, not just the last SQL statement. No asynchronous network work belongs inside the transaction.
-- Full audit history remains deferred. The proposed retain/truncate/delete approach preserves elapsed coverage without adding a full event log, but does not record every cancellation reason or previous commitment.
+- Full audit history remains deferred. The implemented retain/truncate/delete approach preserves elapsed coverage without adding a full event log, but does not record every cancellation reason or previous commitment.
 
 ### Efficiency and coherent reads
 
@@ -256,7 +258,7 @@ The user requested proceeding after the final review. Use the documented model a
 
 1. Distinct trimmed reasons are a JSON array, not a submission audit trail.
 2. Precision edge case to cover in tests: reject intervals that become zero-duration after truncation, while accepting valid finer-precision inputs with positive normalized duration.
-3. Agreed enforcement boundaries: cross-row role/containment/overlap checks in the transactional API, SQL constraints for structural integrity. Database-wide trigger protection is not part of the current implementation plan.
+3. Agreed enforcement boundaries: cross-row role/containment/overlap checks in the transactional API, SQL constraints for structural integrity. Database-wide trigger protection is not implemented.
 4. Use the cancellation/early-return behavior, in-progress claim policy, and read-snapshot/network recovery described above.
 5. Breaks use separate required-coverage absence windows (for example, 09:00–12:00 and 13:00–16:00), not guessed lunch breaks inside 09:00–16:00. Certifications are display-only metadata; eligibility and expiry enforcement, availability calendars, and workload limits are deferred.
 
