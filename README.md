@@ -70,3 +70,19 @@ Before writing application code, ask your AI assistant to propose a database sch
 ## Submission Instructions
 1. Commit your progress at logical milestones (e.g., `1. Architecture plan`, `2. DB & API`, `3. UI & Tests`) so we can see your progression in `.git`.
 2. **Delete `node_modules/`** and `school.db`, then zip the entire project folder (making sure the hidden `.git` folder is included) and send it back to us.
+
+---
+
+## Documentation
+
+The original assessment instructions above are preserved. Required deliverables remain at the project root; supporting documents are in `docs/`.
+
+| Document | Purpose |
+| --- | --- |
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | Implemented schema, API contracts, Mermaid diagrams, and design corrections |
+| [AI_LOG.md](./AI_LOG.md) | Collaboration summary, caught bugs, and verification evidence |
+| [Demo and submission checklist](./docs/DEMO.md) | Run instructions, walkthrough, known limits, and final checklist |
+| [Design review](./docs/DESIGN_REVIEW.md) | Correctness risks, algorithm tradeoffs, and production boundaries |
+| [Roadmap](./docs/ROADMAP.md) | Planning decisions, milestones, and verification strategy |
+| [Chat transcript](./docs/AI_TRANSCRIPT.md) | Readable user/assistant session export; privacy review before sharing |
+| [agents.md](./agents.md) | Agent handoff, working agreement, and next steps |

@@ -2,7 +2,7 @@
 
 ## Status
 
-This began as a prospective design review. The feature has 136 tests including rollback, concurrency, DOM/API behavior, AM/PM, and accurate merge outcomes. Chromium also verifies the reported November #3/#4 adjacency/retry/protection case and real consolidation IDs. This is not full production coverage. Contracts are in `ARCHITECTURE.md`; walkthrough in `DEMO.md`.
+This began as a prospective design review. The feature has 136 tests including rollback, concurrency, DOM/API behavior, AM/PM, and accurate merge outcomes. Chromium also verifies the reported November #3/#4 adjacency/retry/protection case and real consolidation IDs. This is not full production coverage. Contracts are in [ARCHITECTURE.md](../ARCHITECTURE.md); walkthrough in [DEMO.md](./DEMO.md).
 
 ## High-priority correctness scenarios
 

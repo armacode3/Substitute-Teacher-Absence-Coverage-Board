@@ -6,11 +6,13 @@
 
 ## 2. Session Transcripts / Key Prompts
 
-Key prompts, decisions, and verification from this session are recorded below rather than claiming a transcript export or share link exists.
+Readable session export: **[docs/AI_TRANSCRIPT.md](./docs/AI_TRANSCRIPT.md)**. It contains the 21 user messages and 49 visible assistant text blocks present in the local session snapshot, including the design discussion, refinements, bug investigation, and final review. Internal reasoning, system instructions, tool payloads, and compaction summaries are excluded; scope and UTC timestamps are documented in the transcript. No public link was created. The user authorized its local Git commit; owner privacy review is still recommended before external sharing.
+
+Key prompts, decisions, and verification are summarized below.
 
 ### Planning and architecture review
 
-- The user requested reading the starter architecture and `README.md`, proposing alternatives, building a roadmap, and updating `agents.md` after changes. The assistant created `ROADMAP.md`, established a passing one-test baseline, and initialized Git with approval.
+- The user requested reading the starter architecture and `README.md`, proposing alternatives, building a roadmap, and updating `agents.md` after changes. The assistant created `docs/ROADMAP.md`, established a passing one-test baseline, and initialized Git with approval.
 - Initial AI proposal: a single absence table with nullable substitute assignment, derived Open/Claimed status, normalized timestamps, and an immediate claim transaction.
 - User: "I belive that overlapping absences for the same teacher should be combined into one?" Review established merging only open absences, with no partial writes when accepted coverage would be affected.
 - User approved: "We can merge overlapping open teacher absences bu cannot merge overlaps involving claimed absences with substitutes?" The design records `409` rejection and unchanged coverage for that case.
@@ -19,7 +21,7 @@ Key prompts, decisions, and verification from this session are recorded below ra
 - User selected the recommended ISO contract, allowing JavaScript-friendly UTC millisecond storage, and said: "Let's preserve the distinct reasons" when merging.
 - Revised design: timed assignment records, derived partial/full coverage and gaps, no overlapping coverage within an absence, no overlapping substitute assignments globally, and merge rejection whenever any affected absence has even partial coverage.
 - The user approved retaining the lowest existing ID during merges and the structural integrity boundaries. They challenged rejecting valid timestamps with more than millisecond precision; the revised policy accepts them with explicit fractional-second truncation and revalidates normalized intervals.
-- The user requested stepping back to examine unhandled real-world cases and failure modes. Added `DESIGN_REVIEW.md` distinguishing prospective correctness risks from unsupported product/production use cases. A key new finding is stale intent: an ID-only claim could cover an expanded merge-survivor window the substitute never saw. Explicit submitted times limit that risk; stricter request/version policies remain for discussion.
+- The user requested stepping back to examine unhandled real-world cases and failure modes. Added `docs/DESIGN_REVIEW.md` distinguishing prospective correctness risks from unsupported product/production use cases. A key new finding is stale intent: an ID-only claim could cover an expanded merge-survivor window the substitute never saw. Explicit submitted times limit that risk; stricter request/version policies remain for discussion.
 - At the risk-review stage, the user approved required claim times, ended-window rejection, visible timezone, duplicate-click/network recovery, and concurrency/rollback priority. They requested cancellation and early return while deferring full audits and reason-privacy features. Certification/breaks were then still under discussion. Documented gap scanning, indexed lookup tradeoffs, read snapshots, and lifecycle proposals before feature code.
 
 ### Implementation and verification
@@ -43,7 +45,7 @@ Key prompts, decisions, and verification from this session are recorded below ra
 - `npm test` and `npm test -- --sequence.shuffle --sequence.seed=20261107`: **108 tests passed in 4 files** (72 API, 3 gap, 9 concurrency/persistence, 24 frontend). Final Chromium smoke and all three Mermaid parser checks also passed after the last UI change. Whitespace validation passed with `git -c core.whitespace=cr-at-eol diff --check`, respecting the inherited lockfile line endings.
 - Installed Playwright/Chromium only under `/tmp/opencode/aps-browser-UGqW6a`, outside project dependencies. Command: `PLAYWRIGHT_BROWSERS_PATH=/tmp/opencode/aps-browser-UGqW6a/browsers node /tmp/opencode/aps-browser-UGqW6a/smoke.cjs`, run from the project folder. The temporary script launches the real HTTP app with an in-memory DB and deterministic clock, and closes all resources afterward.
 - Chromium 158 smoke results: desktop/mobile create → split → full coverage; safe markup-like text and credential display; cancellation reopening a middle gap; early return removing later assignments; stale conflicting claims in two pages; a committed write whose HTTP response is deliberately lost with no automatic retry; New York later DST-fold preservation and spring-forward rejection. All passed, with no uncaught browser JavaScript errors. Desktop/mobile screenshots were inspected and live only in the temporary validation directory, not the submission.
-- Dependency checks: six findings in the existing Vitest/Vite dev-tool chain (3 moderate, 1 high, 2 critical). `npm audit --omit=dev` reports zero findings. No unrelated major/force upgrades were applied; this limitation is documented in `DEMO.md`.
+- Dependency checks: six findings in the existing Vitest/Vite dev-tool chain (3 moderate, 1 high, 2 critical). `npm audit --omit=dev` reports zero findings. No unrelated major/force upgrades were applied; this limitation is documented in `docs/DEMO.md`.
 
 ### User-requested time-picker refinement
 
@@ -88,12 +90,32 @@ Key prompts, decisions, and verification from this session are recorded below ra
 ### Final submission review
 
 - User confirmed: "I included a third absences and all three merged to 1 keeping the lowest ID," then requested a final README/architecture check. This confirms successful consolidation; it does not establish the historical request sequence behind the earlier misleading feedback.
-- Checked all four README deliverables and milestone history against implementation. Kept the original assessment README unchanged; `DEMO.md` now includes a requirement checklist and the verified Node/npm environment.
+- Checked all four README deliverables and milestone history against implementation. Kept the original assessment README unchanged at that checkpoint; `docs/DEMO.md` includes a requirement checklist and the verified Node/npm environment. A documentation index was later appended without altering the original assessment instructions.
 - Found an actual submission-portability defect: file-backed concurrency tests required `/tmp/opencode` on the reviewer's machine. Changed them to `join(tmpdir(), 'aps-api-test-')`; Node's OS temporary directory is portable and honors `TMPDIR` for this environment. No production behavior changed.
 - Corrected stale architecture status/enforcement wording, fractional-second wording, create-response outcomes, and the create flowchart: request syntax is checked before the transaction, teacher existence/role inside it.
 - Final normal and shuffled suites both pass **136 tests**. All three updated Mermaid diagrams pass parser validation. Both isolated Chromium scripts pass again, with no page errors. No checks write to the user's `school.db`.
 - Fresh-install verification at `/tmp/opencode/aps-submission-check-4kyNkE`: copied tracked source files (not the working database/dependencies), ran `npm ci --no-audit --no-fund`, then `npm test` with a separate `TMPDIR`. All **136 tests passed**. Existing deprecation warnings for `whatwg-encoding` and `prebuild-install` did not prevent installation. CRLF-aware whitespace validation also passed.
-- Transcript requirement remains open: tested `opencode session export ses_e4c8798dbffejTo3E9MhMbPu82 --sanitize` to a scratch file outside the repository. It exports JSON but redacts user prompt text, so it is not a useful readable transcript and is not presented as completing README line 66. A readable export/share link still needs privacy review and attachment. No transcript was published or committed.
-- Submission cleanup/archive and any dependency-toolchain upgrade remain approval-gated. Runtime dependency audit: zero findings; development toolchain: six existing findings, including critical, as disclosed in `DEMO.md`.
+- Transcript requirement was still open at this review checkpoint: tested `opencode session export ses_e4c8798dbffejTo3E9MhMbPu82 --sanitize` to a scratch file outside the repository. It exports JSON but redacts user prompt text, so it was not counted as useful readable evidence. The later user-requested Markdown export below supplies the attachment; no public transcript was published.
+- Submission cleanup/archive and any dependency-toolchain upgrade remain approval-gated. Runtime dependency audit: zero findings; development toolchain: six existing findings, including critical, as disclosed in `docs/DEMO.md`.
 
-Browser checks cover Chromium desktop/mobile emulation, not every browser/device. Full authentication, production security, credential verification, and dependency-toolchain upgrades remain outside the agreed feature scope. The user has exercised merging successfully; transcript attachment and final submission cleanup remain outstanding.
+### User-requested Markdown transcript
+
+- User requested: "Can you create it into a markdown transcript". Exported the stored OpenCode session locally and converted only user text and assistant `text` content into `docs/AI_TRANSCRIPT.md` (initially at the root), preserving original wording and stored conversation order with UTC timestamps.
+- Snapshot includes **21 user messages and 49 assistant text blocks** through that request. Excluded internal reasoning, tool calls/results, system/developer instructions, synthetic/status events, and compaction summaries. Any conversation not retained by the source was not reconstructed; in-progress replies are outside the snapshot.
+- Linked the readable export here and updated the final checklist in `docs/DEMO.md`. The raw JSON and temporary converter remain outside the repository; no public upload/share link was created.
+- Checked common credential/private-key patterns and transcript structure. Transcript and documentation updates were initially left uncommitted for owner review; the user subsequently authorized the final local Git commit. No application code/dependencies/data changed in the transcript creation step, so no new runtime test run is claimed for that step.
+
+### User-approved documentation layout
+
+- User approved moving supporting documents into `docs/`: demo/checklist, design review, roadmap, and Markdown transcript. Required `ARCHITECTURE.md` and `AI_LOG.md`, the assessment `README.md`, and `agents.md` remain at the root.
+- Appended a documentation index to `README.md` without changing its original assessment instructions. Updated current links/references and clarified that commands in the demo run from the project root. Transcript message bodies remain unchanged; only its navigation/scope header was adjusted for the new location.
+- Validation: all **27 relative documentation links** resolve; original README assessment text is preserved; all **70 transcript blocks** still match the exported user/assistant wording in order. Changed/moved-file whitespace checks pass, and `TMPDIR=/tmp/opencode npm test` passes all **136 tests** after the moves.
+- Documentation-only change; no application/dependency/data changes. These updates were initially held for privacy review; the user subsequently authorized committing them locally. External sharing and cleanup/archive remain separate actions.
+
+### Final Git preparation
+
+- User requested the final Git commit for submission preparation, authorizing the pending documentation layout and readable transcript to be committed locally. This does not assert that a separate human privacy review occurred.
+- Final documentation milestone includes the `docs/` moves, transcript attachment, README index, updated references, and current handoff/checklist. Dependencies, the working database, and scratch/raw exports are excluded. No remote push, cleanup, public upload, or ZIP creation is part of this request.
+- Pre-commit verification: all **136 tests** pass again, all **27 local documentation links** resolve, and the transcript retains **70 readable blocks** with no common credential patterns detected. Staged documentation whitespace is checked before committing.
+
+Browser checks cover Chromium desktop/mobile emulation, not every browser/device. Full authentication, production security, credential verification, and dependency-toolchain upgrades remain outside the agreed feature scope. The user has exercised merging successfully; transcript privacy review and final submission cleanup remain outstanding.

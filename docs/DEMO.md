@@ -2,6 +2,8 @@
 
 ## Start
 
+Run these commands from the project root, not the `docs/` folder.
+
 ```bash
 npm install
 npm run dev
@@ -57,21 +59,22 @@ Final review also verified `npm ci` followed by `npm test` in an isolated source
 
 ## Known limits
 
-No authentication, credential verification/management, recurrence, travel/workload rules, full audit history, or automatic lunch calendar. Schema cross-row invariants assume writes use the API. See `ARCHITECTURE.md` and `DESIGN_REVIEW.md` for boundaries.
+No authentication, credential verification/management, recurrence, travel/workload rules, full audit history, or automatic lunch calendar. Schema cross-row invariants assume writes use the API. See [ARCHITECTURE.md](../ARCHITECTURE.md) and [DESIGN_REVIEW.md](./DESIGN_REVIEW.md) for boundaries.
 
 The dependency audit currently reports six findings in the starter's Vitest/Vite development-tool chain (including critical findings). `npm audit --omit=dev` reports zero production-dependency findings. A toolchain update needs separate review/testing; no `npm audit fix --force` was applied. Do not expose development/test servers or run untrusted test code.
 
-Submission cleanup has not been performed: keep dependencies and local data until the final review, then follow the original `README.md` packaging instructions with user approval, including the hidden `.git` directory.
+Submission cleanup has not been performed: keep dependencies and local data until the final review, then follow the original [README.md](../README.md) packaging instructions with user approval, including the hidden `.git` directory.
 
 ## Final README requirement check
 
-- [x] Reviewed Mermaid schema/API flows and three genuine design corrections in `ARCHITECTURE.md`; architecture commit `512f9ab` precedes application code.
+- [x] Reviewed Mermaid schema/API flows and three genuine design corrections in [ARCHITECTURE.md](../ARCHITECTURE.md); architecture commit `512f9ab` precedes application code.
 - [x] SQLite schema and backend create/list/claim endpoints, role/time validation, interval conflict checks, transactional writes, and rollback tests.
 - [x] Functional teacher/substitute UI showing names, windows, assignments, and Open/Claimed status. Partially Covered and lifecycle operations are approved extensions.
 - [x] Happy-path/edge-case API tests plus independent-process concurrency and frontend tests: **136 passing**, including a shuffled run.
-- [x] `AI_LOG.md` records actual collaboration, corrections, and discovered bugs. User confirmed three overlapping absences consolidated under the lowest ID.
+- [x] [AI_LOG.md](../AI_LOG.md) records actual collaboration, corrections, and discovered bugs. User confirmed three overlapping absences consolidated under the lowest ID.
 - [x] Logical architecture/backend/frontend/refinement commits preserved in `.git`.
-- [ ] Attach a **readable chat/CLI export or link** in `AI_LOG.md` as required by README line 66. The available sanitized export redacts prompt text, so it is not treated as sufficient evidence. Review any readable export for private data before including it.
+- [x] Attach a **readable chat/CLI export or link** in [AI_LOG.md](../AI_LOG.md) as required by README line 66: [AI_TRANSCRIPT.md](./AI_TRANSCRIPT.md), converted from the stored session with original user/assistant wording. Internal reasoning and tool payloads are excluded; see its scope notes.
+- [ ] Owner review of the readable transcript for privacy before external sharing. The user authorized the final local Git commit including the transcript and documentation; no public upload has been performed.
 - [ ] With user approval, perform final cleanup and create/inspect the submission ZIP: include hidden `.git`, exclude `node_modules/` and generated SQLite files. Preserve the user's working demo data until that approval.
 
 No core architecture blocker was identified in the final review. Existing development-tool audit findings remain disclosed above; this is a take-home implementation, not a production-security sign-off.

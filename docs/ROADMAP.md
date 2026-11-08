@@ -1,5 +1,7 @@
 # APS Take-Home: Implementation Roadmap
 
+Supporting document; source-file paths below are relative to the project root. See the [README documentation index](../README.md#documentation) for the current layout.
+
 ## Goal and scope
 
 Build a reliable teacher absence and substitute coverage workflow using the existing stack. The required outcome is:
@@ -22,8 +24,8 @@ The README suggests a roughly 60-minute exercise. Favor correctness and a small 
 | `src/validation.js`, `src/errors.js` | Strict ISO/ID/body validation, millisecond normalization, and business errors. |
 | `public/index.html`, `public/app.js` | Build-free HTML/vanilla JS; directory/credentials, creation, coverage/gaps, explicit claims, lifecycle controls, timezone previews, pending state, and refresh recovery. |
 | `tests/api.test.js`, `tests/coverage.test.js`, `tests/concurrency.test.js`, `tests/frontend.test.js` | 136 tests covering API, rollback, persistence/concurrency, DOM interactions, AM/PM, and accurate adjacent/update/no-op/merge feedback. Temporary data/connections are cleaned up. |
-| `ARCHITECTURE.md` | Reviewed ERD, create/merge and claim flows, three genuine design corrections, finalized contracts, and implementation checkpoint. |
-| `AI_LOG.md` | Real planning prompts, review corrections, implementation findings, and test evidence. |
+| [ARCHITECTURE.md](../ARCHITECTURE.md) | Reviewed ERD, create/merge and claim flows, three genuine design corrections, finalized contracts, and implementation checkpoint. |
+| [AI_LOG.md](../AI_LOG.md) | Real planning prompts, review corrections, implementation findings, and test evidence. |
 
 Request flow: browser → Express routes → synchronous `better-sqlite3` queries → SQLite → JSON response → browser rendering. No frontend build, authentication, ORM, or external service is present or needed for the stated task.
 
@@ -88,7 +90,7 @@ Responses are implemented with joined display data, `Open` / `Partially Covered`
 
 **Approved:** require explicit start/end on every claim; remove the whole-current-absence shortcut. Never silently claim multiple gaps or trim/expand requested windows. The UI allows claims on Open and Partially Covered records with non-expired requested windows.
 
-Concurrency/recovery recommendation: all writes use short immediate transactions with all-or-nothing rollback; construct board data with batched reads in one consistent snapshot. Disable pending controls, recover ambiguous network outcomes by refreshing, and do not blindly retry writes. Gap scanning is linear in that absence's ordered assignments; indexed teacher-overlap lookup and its performance limits are documented in `DESIGN_REVIEW.md`.
+Concurrency/recovery recommendation: all writes use short immediate transactions with all-or-nothing rollback; construct board data with batched reads in one consistent snapshot. Disable pending controls, recover ambiguous network outcomes by refreshing, and do not blindly retry writes. Gap scanning is linear in that absence's ordered assignments; indexed teacher-overlap lookup and its performance limits are documented in [DESIGN_REVIEW.md](./DESIGN_REVIEW.md).
 
 ## Implementation milestones
 
@@ -165,4 +167,4 @@ Additional reliability checks if time permits:
 
 ## Current next action
 
-Architecture, backend, and frontend are implemented and tested; the verified UI change set is the third feature milestone. Next: the user's final walkthrough and deliverable review using `DEMO.md`. Note the six existing dev-tool audit findings (production-only audit is zero); do not force-upgrade without separate review. Submission cleanup/packaging remains gated on user approval.
+Architecture, backend, and frontend are implemented and tested; final review and a successful user merge walkthrough are complete. The remaining submission checklist is in [DEMO.md](./DEMO.md): transcript privacy review and approval-gated cleanup/packaging. Note the six existing dev-tool audit findings (production-only audit is zero); do not force-upgrade without separate review.

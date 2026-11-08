@@ -240,7 +240,7 @@ These are explicit lifecycle operations, not exceptions that allow ordinary merg
 
 Gap computation is a cursor scan over assignments ordered by start time: `O(k)` for `k` assignments, with `O(g)` output for `g` gaps (at most `k + 1`). An `(absence_id, start_time)` index avoids a separate sort when the query planner uses that order. No minute-by-minute search or all-pairs comparison is needed.
 
-For teacher merges, a simple indexed overlap query is the clearest baseline. A composite B-tree does not automatically make a two-ended interval query `O(log n + matches)`; many historical rows can still require filtering. Because the application maintains non-overlapping absences per teacher, an optional tighter algorithm uses one predecessor lookup and a start-time range scan, approximately `O(log t + m)` for `t` teacher records and `m` matches, plus writes. Its invariant and alternatives are explained in `DESIGN_REVIEW.md`.
+For teacher merges, a simple indexed overlap query is the clearest baseline. A composite B-tree does not automatically make a two-ended interval query `O(log n + matches)`; many historical rows can still require filtering. Because the application maintains non-overlapping absences per teacher, an optional tighter algorithm uses one predecessor lookup and a start-time range scan, approximately `O(log t + m)` for `t` teacher records and `m` matches, plus writes. Its invariant and alternatives are explained in [docs/DESIGN_REVIEW.md](./docs/DESIGN_REVIEW.md).
 
 Assemble a list response from batched absence/assignment reads in one short read transaction, not per-row queries across inconsistent snapshots. Keep write transactions short; SQLite still serializes writers. Test real separate connections/processes as well as ordinary API outcomes.
 
@@ -266,7 +266,7 @@ Authentication and full audit history remain deferred; the user deprioritized re
 
 ## 4. Risk Review and Unsupported Real-World Uses
 
-See `DESIGN_REVIEW.md` for prospective failure scenarios, test recommendations, algorithm complexity, and production limits. The stale optional-time claim shortcut has been removed following user review. Other recommendations are not automatically approved beyond the goals recorded above.
+See [docs/DESIGN_REVIEW.md](./docs/DESIGN_REVIEW.md) for prospective failure scenarios, test recommendations, algorithm complexity, and production limits. The stale optional-time claim shortcut has been removed following user review. Other recommendations are not automatically approved beyond the goals recorded above.
 
 ## 5. Implementation Checkpoint
 
@@ -276,4 +276,4 @@ The UI provides teacher/substitute selectors, creation/merge feedback, all cover
 
 Chosen gap inputs retain their original ISO instant while unchanged, avoiding ambiguous-DST-fold loss and accidental millisecond truncation when showing whole seconds. Editing date/time intentionally creates a whole-second value; switching editor modes alone preserves the original instant. Exact times are not silently snapped to quarter-hour boundaries. Complete and incomplete drafts survive refresh, and optional early-return edits require a date rather than silently becoming "return now". User-edited local dates are checked for calendar/DST normalization; ambiguous times use the browser's earlier occurrence shown in the preview.
 
-Verification: **136 automated tests pass** (74 API, 3 gap, 9 concurrency/persistence, 50 frontend DOM/API). Coverage includes the exact November #3/#4 adjacent/protected case, accurate no-op/update/real-merge feedback, removed IDs, AM/PM, and draft preservation. Independent processes verify competing writes/reads; triggers verify rollback. Mermaid syntax checks pass. Chromium verifies these merge outcomes and the existing picker/lifecycle/conflict/recovery/DST flows. See `DEMO.md`.
+Verification: **136 automated tests pass** (74 API, 3 gap, 9 concurrency/persistence, 50 frontend DOM/API). Coverage includes the exact November #3/#4 adjacent/protected case, accurate no-op/update/real-merge feedback, removed IDs, AM/PM, and draft preservation. Independent processes verify competing writes/reads; triggers verify rollback. Mermaid syntax checks pass. Chromium verifies these merge outcomes and the existing picker/lifecycle/conflict/recovery/DST flows. See [docs/DEMO.md](./docs/DEMO.md).
